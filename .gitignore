@@ -1,0 +1,10 @@
+vc140.pdb
+*.exe
+build.exe*
+*.o
+*.obj
+; ./build
+; *.ir
+.vs
+.vscode
+.qodo
