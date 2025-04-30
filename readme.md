@@ -15,6 +15,7 @@ Inspired by
 Dependencies
 - clang: compiler backend and linking with CRT / Clib
 - llvm: intermediate representation
+- gcc, g++: to build (use cl.exe and link.exe in Windows)
 
 
 Current features/progress:
@@ -26,3 +27,10 @@ Current features/progress:
 
 Implemented keywords:
 - return
+
+
+How to Build:
+1. Compile build.c with your favourite compiler
+2. Run the resulting binary
+3. It should now invoke gcc and g++ to build the project. Alternatively on Windows you can have it invoke cl.exe and link.exe
+4. Profit.
