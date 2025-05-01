@@ -16,7 +16,7 @@ static std::array<const char*, 4> valid_triples = {
 };
 
 size_t find_function(const char* name, const B_Function_Scope& scope);
-size_t find_variable(const char* name, const B_Stack& scope);
+size_t find_variable(const char* name, const B_Variable_Scope& scope);
 
 /* const char* get_target_triple(int i)
 {
@@ -67,9 +67,8 @@ void gen_func_decl(std::string& ir, const B_Function_Scope& s)
 {
 	// Iterate over the vector of FunctionSymbol tuples
 	for (const auto& symbol : s) {
-		const char* name = std::get<0>(symbol); // Extract the name from the tuple
 		ir += "$";
-		ir += name;
+		ir += symbol.name;
 		ir += " = comdat any\n";
 	}
 }
@@ -80,10 +79,9 @@ void gen_func_decl(std::string& ir, const B_Function_Scope& s)
 
 void gen_function_def(std::string& ir, const B_Function& sym)
 {
-	const char* name = std::get<FunctionSymbolIdx::NAME>(sym);
 	ir += "\n; Function Attrs: noinline nounwind optnone\n";
 	ir += "define dso_local i64 @";
-	ir += name;
+	ir += sym.name;
 	ir += "() {\n";
 }
 
@@ -92,12 +90,12 @@ void gen_function_def_end(std::string& ir)
 	ir += "}\n\n";
 }
 
-void gen_keyword(std::string& ir, uint8_t kw_id, const B_Stack& sv)
+void gen_keyword(std::string& ir, uint8_t kw_id, const B_Variable_Scope& sv)
 {
 	switch (kw_id) {
 	case Return:
 		ir += "  ret i64 ";
-		ir += std::to_string(std::get<StackVarIdx::VALUE>(sv[find_variable("___return", sv)]));
+		ir += sv[0].value;
 		ir += "\n";
 		break;
 

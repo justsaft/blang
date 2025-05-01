@@ -1,7 +1,6 @@
 
 #include <stdint.h>
 #include <vector>
-#include <tuple>
 #include <string>
 
 enum Exitcodes {
@@ -23,40 +22,52 @@ enum Exitcodes {
 	INVALID_TARGET_TRIPLE,
 };
 
-//                 name         value    where     file
-typedef std::tuple<const char*, int64_t, uint64_t, uint8_t> B_Variable;
-typedef std::vector<B_Variable> B_Stack;
+enum InlineOperation {
+	Unsuccessful = -1,
+	NotAnOperation,
+	Plus,
+	Minus,
+	Multiply,
+	Divide,
+	BinaryAnd,
+	BinaryOr,
+};
+
+enum /* struct */ Value_Type {
+	Int,
+	Float,
+	String,
+	AutoVar,
+};
 
 typedef struct {
-	enum {
-		NAME,
-		VALUE,
-		WHERE,
-		FILE,
-	};
-} StackVarIdx;
+	const char* name;
+	mutable std::string value;
+	int line_number;
+	int char_offset;
+	uint8_t file;
+	Value_Type value_type;
+} B_Variable;
 
-//                 name         params   where     file
-typedef std::tuple<const char*, uint8_t, uint64_t, uint8_t> B_Function;
+typedef std::vector<B_Variable> B_Variable_Scope;
+
+typedef struct {
+	const char* name;
+	uint8_t amount_params;
+	int line_number;
+	int char_offset;
+	uint8_t filei;
+} B_Function;
+
 typedef std::vector<B_Function> B_Function_Scope;
-
-typedef struct {
-	enum {
-		NAME,
-		PARAMS_AMOUNT,
-		WHERE,
-		FILE,
-	};
-} FunctionSymbolIdx;
 
 typedef std::vector<const char*> CStrings;
 
 
-typedef struct /*_Target*/ {
-	enum struct Bitness {
+typedef struct {
+	enum struct Arch {
 		x86,
 		x86_64,
-		None,
 	};
 
 	enum struct Vendor {
@@ -75,7 +86,7 @@ typedef struct /*_Target*/ {
 		GLIBC,
 	};
 
-	int bitness;
+	int arch;
 	int vendor;
 	int os;
 	int abi;
