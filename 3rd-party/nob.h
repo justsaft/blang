@@ -182,7 +182,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
@@ -1576,21 +1575,21 @@ bool nob_read_entire_file(const char *path, Nob_String_Builder *sb)
     if (f == NULL)                 nob_return_defer(false);
     if (fseek(f, 0, SEEK_END) < 0) nob_return_defer(false);
 #ifndef _WIN32
-    int32_t m = ftell(f);
+    long m = ftell(f);
 #else
-    int64_t m = _ftelli64(f);
+    long long m = _ftelli64(f);
 #endif
     if (m < 0)                     nob_return_defer(false);
     if (fseek(f, 0, SEEK_SET) < 0) nob_return_defer(false);
 
-    size_t new_count = sb->count + (size_t)m;
+    size_t new_count = sb->count + m;
     if (new_count > sb->capacity) {
         sb->items = NOB_REALLOC(sb->items, new_count);
         NOB_ASSERT(sb->items != NULL && "Buy more RAM lool!!");
         sb->capacity = new_count;
     }
 
-    fread(sb->items + sb->count, (size_t)m, 1, f);
+    fread(sb->items + sb->count, m, 1, f);
     if (ferror(f)) {
         // TODO: Afaik, ferror does not set errno. So the error reporting in defer is not correct in this case.
         nob_return_defer(false);
