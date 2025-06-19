@@ -1,10 +1,17 @@
-vc140.pdb
-*.exe
-build.exe*
-*.o
-*.obj
-; ./build
-; *.ir
-.vs
-.vscode
-.qodo
+
+!*.cpp
+!*.c
+!*.b
+!*.ll
+!*.txt
+!*.md
+!.gitattributes
+
+mat/
+build/
+CMakeFiles/
+.vscode/
+blang
+nob
+*.cmake
+CMakeCache.txt

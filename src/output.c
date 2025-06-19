@@ -1,5 +1,6 @@
 
 #define _CRT_SECURE_NO_WARNINGS
+// To shut up MSVC
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,7 +108,7 @@ char* chop_extension(const char* filename)
 		result[len] = '\0';
 		return result;
 	}
-	return strdup(filename); // No extension found, return a copy of the original string
+	return (char*)filename; // No extension found, return a copy of the original string
 }
 
 char* swap_extension(const char* filename, const char* new_extension)
@@ -169,7 +170,6 @@ bool run_clang(const char* output_file, const char* original_file, int stage)
 
 	// After we created the command:...
 	if (!cmd_run_sync_and_reset(&c)) {
-		nob_log(NOB_ERROR, "Couldn't run command: %s", *c.items);
 		return_defer(false);
 	}
 

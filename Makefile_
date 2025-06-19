@@ -1,0 +1,42 @@
+.PHONY: build nob_build
+
+BLD = ./build/
+SRC = ./src/
+FLAGS = -c -Wall -Wextra -ggdb -o
+
+nob_build: nob
+	./nob
+
+build: build_dir $(BLD)main.o $(BLD)ir_gen.o $(BLD)state.o $(BLD)cli.o $(BLD)clex_util.o $(BLD)nob.o $(BLD)clex.o $(BLD)output.o
+	g++ -o blang $(BLD)main.o $(BLD)cli.o $(BLD)clex.o $(BLD)clex_util.o $(BLD)nob.o $(BLD)output.o $(BLD)ir_gen.o $(BLD)state.o
+
+build_dir:
+	mkdir -p $(BLD)
+
+nob:
+	gcc -o nob build.c
+
+$(BLD)main.o:
+	g++ $(FLAGS) $(BLD)main.o $(SRC)main.cpp
+
+$(BLD)ir_gen.o:
+	g++ $(FLAGS) $(BLD)ir_gen.o $(SRC)gen_ir.cpp
+
+$(BLD)state.o:
+	g++ $(FLAGS) $(BLD)state.o $(SRC)state.cpp
+
+$(BLD)cli.o:
+	g++ $(FLAGS) $(BLD)cli.o $(SRC)cli.cpp
+
+$(BLD)clex_util.o:
+	g++ $(FLAGS) $(BLD)clex_util.o $(SRC)clex_util.cpp
+
+$(BLD)nob.o:
+	gcc $(FLAGS) $(BLD)nob.o $(SRC)nob.c
+
+$(BLD)clex.o:
+	gcc $(FLAGS) $(BLD)clex.o -Wno-unused-function $(SRC)clex.c
+
+$(BLD)output.o:
+	gcc $(FLAGS) $(BLD)output.o $(SRC)output.c
+
