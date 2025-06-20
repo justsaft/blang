@@ -1,0 +1,36 @@
+name: Workflows
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  comptests_nob:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:noble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Clang and build utils
+        run: |
+          apt-get update
+          apt-get install clang gcc g++ build-essential
+      - name: Compile with nob
+        run: |
+          gcc -Wall -Wextra -o nob build.c
+          ./nob
+
+  comptests_cmake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Clang and build utils
+        run: |
+          apt-get update
+          apt-get install clang gcc g++ build-essential cmake ninja
+      - name: Compile with CMake
+        run: |
+          cmake .
