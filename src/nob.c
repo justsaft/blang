@@ -3,20 +3,20 @@
 #define NOB_IMPLEMENTATION
 #include "../3rd-party/nob.h"
 
-/* bool _return_defer(bool value)
+
+bool nob_delete_file_silent(const char* path)
 {
-    bool result = true;
-    nob_return_defer(value);
-
-defer:
-    return result;
-} */
-
-
-//void _nob_append_sb_cstr(Nob_String_Builder* sb, const char* cstr, ...) {
-//   va_list args;
-//   va_start(args, cstr);
-//   nob_sb_append_cstr(sb, cstr); // Fix: Pass `sb` directly instead of `&sb`
-//   nob_sb_append_null(sb);
-//   va_end(args);
-//}
+#ifdef _WIN32
+    if (!DeleteFileA(path)) {
+        nob_log(NOB_ERROR, "Could not delete file %s: %s", path, nob_win32_error_message(GetLastError()));
+        return false;
+    }
+    return true;
+#else
+    if (remove(path) < 0) {
+        nob_log(NOB_ERROR, "Could not delete file %s: %s", path, strerror(errno));
+        return false;
+    }
+    return true;
+#endif // _WIN32
+}
