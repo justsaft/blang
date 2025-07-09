@@ -4,7 +4,6 @@
 #include "3rd-party/nob.h"
 
 #define FLAGS "-c", "-Wall", "-Wextra", "-ggdb"
-#define CLANGPPC "clang++", "-c", "-o"
 
 #if _WIN32
 // Windows:
@@ -13,8 +12,8 @@
 #define GPPC "g++", FLAGS, "-o"
 #define GCCL "g++", "-o", "blang"
 #elif defined(__clang__)
+#define GPPC "clang++", "-c", "-o"
 #define GCCC "clang", "-c", "-o"
-#define GPPC CLANGPPC
 // TODO: Clang currently doesn't get any flags. Might be nessessary for cross-compilation or debugging in the future
 #elif defined(_MSC_VER)
 #define GCCC "cl.exe", "/EHsc", "/c", "/W3", "/Zi", /*"/FS",*/ "/Fo:"
@@ -25,7 +24,7 @@
 #else
 // Linux:
 #define GCCC "gcc", FLAGS, "-o"
-#define GPPC "g++", FLAGS, "-o"
+#define GPPC "g++", FLAGS, "-std=c++20", "-o"
 #define GCCL "g++", "-o", "blang"
 
 #endif
@@ -53,14 +52,14 @@ int main(int argc, char** argv)
 #define a 8
 
 	Nob_Cmd cmds[a] = { 0 };
-	nob_cmd_append(&cmds[0], GPPC, 		BLD"main.o", 							SRC"main.cpp");
-	nob_cmd_append(&cmds[1], GPPC, 		BLD"gen_ir.o", 							SRC"gen_ir.cpp");
-	nob_cmd_append(&cmds[2], GPPC, 		BLD"state.o", 							SRC"state.cpp");
-	nob_cmd_append(&cmds[3], GPPC, 		BLD"cli.o", 							SRC"cli.cpp");
-	nob_cmd_append(&cmds[4], GPPC, 		BLD"clex_util.o", 						SRC"clex_util.cpp");
-	nob_cmd_append(&cmds[5], GCCC, 		BLD"nob.o", 							SRC"nob.c");
-	nob_cmd_append(&cmds[6], GCCC, 		BLD"clex.o", "-Wno-unused-function",	SRC"clex.c");
-	nob_cmd_append(&cmds[7], GCCC, 		BLD"output.o", 							SRC"output.c");
+	nob_cmd_append(&cmds[0], GPPC, BLD"main.o", 						SRC"main.cpp");
+	nob_cmd_append(&cmds[1], GPPC, BLD"gen_ir.o", 						SRC"gen_ir.cpp");
+	nob_cmd_append(&cmds[2], GPPC, BLD"state.o", 						SRC"state.cpp");
+	nob_cmd_append(&cmds[3], GPPC, BLD"cli.o", 							SRC"cli.cpp");
+	nob_cmd_append(&cmds[4], GPPC, BLD"clex_util.o", 					SRC"clex_util.cpp");
+	nob_cmd_append(&cmds[5], GCCC, BLD"nob.o", 							SRC"nob.c");
+	nob_cmd_append(&cmds[6], GCCC, BLD"clex.o", "-Wno-unused-function",	SRC"clex.c");
+	nob_cmd_append(&cmds[7], GCCC, BLD"output.o", 						SRC"output.c");
 
 	pid_t pids[a] = { 0 };
 	size_t results[a] = { 0 };
