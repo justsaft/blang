@@ -26,21 +26,23 @@ Name obviously comes from the B language and its backend.
 
 
 ### Inspiration
-Idea stolen from/SHoutout to:
+Idea stolen from/Shoutout to:
 - https://www.youtube.com/watch?v=gS_jY8iPBv8
 - https://github.com/tsoding/b
 
 
 ### Dependencies
-- `clang`: compiler backend and linking with CRT / Clib
+To run the compiler:
+- `clang`: compiler backend
 - `llvm`: intermediate representation
 
-To build with build.c (nob) or Makefile:
-`gcc g++ build-essential clang`
+To build the compiler:
+`gcc g++ build-essential` optionally: `clang cmake make`
 
 
 ### Implemented keywords
-No keywords have been implemented yet.
+- return
+- auto
 
 
 ### How to Build
@@ -53,7 +55,7 @@ Notes for Windows: To build on Windows you have multiple options:
 #### Option A:
 
 > 1. Compile `build.c` with your favourite compiler
-> 2. Run the resulting binary, it is your build "script"
+> 2. Run the resulting binary, it is your build "script".
 > 3. It should now invoke `gcc` and `g++` to build the project.
 > 4. Profit.
 
