@@ -2,10 +2,12 @@
 !*.cpp
 !*.c
 !*.b
-!*.ll
 !*.txt
 !*.md
 !.gitattributes
+!.gitignore
+!Makefile_
+!CMakeLists.txt
 
 mat/
 build/
@@ -15,3 +17,4 @@ blang
 nob
 *.cmake
 CMakeCache.txt
+*.ll
