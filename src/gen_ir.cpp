@@ -44,24 +44,23 @@ void gen_file_ir_info(IR& ir, const char* target, const char* file_name)
 // variables
 // ---------
 
-/* void gen_var_decl(IR& ir, const B_Variable& svar)
+/* void gen_alloca(IR& ir, const B_Variable& svar)
 {
 	NOB_UNUSED(ir);
 	NOB_UNUSED(svar);
 	NOB_TODO("Implement var declarations");
 } */
 
-void gen_all_var_decls(IR& ir, const B_Variable_Scope& s, CStrings& input_files)
+void gen_all_var_decls(IR& ir, const B_Variable_Scope& vars, const CStrings& files)
 {
-
-	for (size_t i = 1; i < s.size(); ++i)
+	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)vars.size(); ++i)
 	{
-		if (s[i].value_type == Uninitialized)
+		if (vars[i].value_type == Uninitialized)
 		{
-			nob_log(NOB_WARNING, "%s:%d:%d: Unused variable: `%s`.", input_files[s[i].file], s[i].location.line_number, s[i].location.line_offset, s[i].name);
-			compilation_error(UnusedVariable);
+			nob_log(NOB_WARNING, "%s:%d:%d: Unused variable: `%s`.", files[vars[i].file], vars[i].location.line_number, vars[i].location.line_offset, vars[i].name);
+			Compilation_error(UnusedVariable);
 		}
-		ir += s[i].ir;
+		ir.append(vars[i].ir);
 	}
 }
 
@@ -153,17 +152,17 @@ void gen_func_parameter(IR& ir, size_t vn)
 // auto keyword
 // ------------
 
-void gen_auto_keyword_gvar(IR& ir, const B_Variable& v, const std::string& value)
+void gen_gvar_decl(IR& ir, const B_Variable& v, const std::string& value)
 {
 	// @globvar2 = dso_local global i64 0, align 8
 	ir += "@";
-	ir += v.name;
+	ir.append(v.name);
 	ir += " = dso_local global i64 ";
-	ir += value;
+	ir.append(value);
 	ir += ", align 8\n";
 }
 
-void gen_auto_keyword_decl(IR& ir, Variable_Id id)
+void gen_alloca(IR& ir, Variable_Id id)
 {
 	ir += "  %";
 	ir.append(std::to_string(id));
@@ -171,12 +170,12 @@ void gen_auto_keyword_decl(IR& ir, Variable_Id id)
 	ir += ", align 8\n";
 }
 
-void gen_auto_keyword_def(IR& ir, Variable_Id id, const std::string& value)
+void gen_store_gvar_dest_ptrsrc(IR& ir, const std::string& dest, const Variable_Id ptrsrc)
 {
 	ir += "  store i64 ";
-	ir.append(value);
+	ir.append(dest);
 	ir += ", ptr %";
-	ir.append(std::to_string(id));
+	ir.append(std::to_string(ptrsrc));
 	ir += ", align 8\n";
 }
 
@@ -195,17 +194,17 @@ void gen_assignment_gvar_to_lvar(IR& ir, const Variable_Id dest, const std::stri
 	// yields a pointer!
 }
 
-void gen_assignment_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value)
+void gen_store_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value)
 {
 	// store i64 45, ptr @globvar2, align 8
 	ir += "  store i64 ";
-	ir.append(value);
-	ir += ", ptr @";
 	ir.append(dest);
+	ir += ", ptr @";
+	ir.append(value);
 	ir += ", align 8\n";
 }
 
-void gen_assignment_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src)
+void gen_store_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src)
 {
 	// store i64 45, ptr @globvar2, align 8
 	ir += "  store i64 %";
@@ -215,7 +214,7 @@ void gen_assignment_lval_to_gvar(IR& ir, const std::string& dest, const Variable
 	ir += ", align 8\n";
 }
 
-void gen_assignment_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value)
+void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value)
 {
 	/*
 	%ptr = alloca i64                               ; yields ptr -- var decl
@@ -245,7 +244,26 @@ void gen_assignment_rval_to_lval(IR& ir, const Variable_Id dest, const std::stri
 	ir += ", align 8\n";
 }
 
-void gen_assignment_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+void gen_store_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+{
+	// %1 = load i64* %2, align 8
+	ir += "  %";
+	ir.append(std::to_string(dest));
+	ir += " = store i64 %";
+	ir.append(std::to_string(src));
+	ir += ", align 8\n";
+}
+
+void gen_load_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+{
+	ir += "  %";
+	ir.append(std::to_string(dest));
+	ir += " = load i64, ptr %";
+	ir.append(std::to_string(src));
+	ir += ", align 8\n";
+}
+
+void gen_load_lvalptr_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
 {
 	// %1 = load i64* %2, align 8
 	ir += "  %";
@@ -276,19 +294,6 @@ void gen_return_keyword_lvalue(IR& ir, Variable_Id n)
 	ir += "  ret i64 %";
 	ir.append(std::to_string(n));
 	ir += "\n";
-}
-
-
-// Load ptr
-// --------
-
-void gen_load(IR& ir, Variable_Id dest, Variable_Id src)
-{
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = load i64, ptr %";
-	ir.append(std::to_string(src));
-	ir += ", align 8\n";
 }
 
 

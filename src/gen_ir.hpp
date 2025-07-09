@@ -13,7 +13,7 @@ void gen_file_ir_info(IR& ir, const char* target, const char* file_name);
 
 // variables
 // ---------
-void gen_all_var_decls(IR& ir, const B_Variable_Scope& s, CStrings& input_files);
+void gen_all_var_decls(IR& ir, const B_Variable_Scope& s, const CStrings& files);
 
 
 // function bodies
@@ -37,18 +37,20 @@ void gen_func_parameter(IR& ir, size_t vn);
 
 // auto keyword
 // ------------
-void gen_auto_keyword_decl(IR& ir, Variable_Id vn);
-void gen_auto_keyword_def(IR& ir, Variable_Id vn, const std::string& value);
-void gen_auto_keyword_gvar(IR& ir, const B_Variable& v, const std::string& value);
+void gen_alloca(IR& ir, Variable_Id vn);
+void gen_store_gvar_dest_ptrsrc(IR& ir, const std::string& dest, const Variable_Id ptrsrc);
+void gen_gvar_decl(IR& ir, const B_Variable& v, const std::string& value);
 
 
 // assignments
 // -----------
-void gen_assignment_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value);
-void gen_assignment_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value);
+void gen_store_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value);
+void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value);
+void gen_store_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src);
+void gen_store_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
 void gen_assignment_gvar_to_lvar(IR& ir, const Variable_Id dest, const std::string& src);
-void gen_assignment_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src);
-void gen_assignment_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
+void gen_load_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
+void gen_load_lvalptr_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
 
 
 // return keyword
@@ -56,12 +58,6 @@ void gen_assignment_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_
 void gen_return_keyword(IR& ir);
 void gen_return_keyword_rvalue(IR& ir, const std::string& n);
 void gen_return_keyword_lvalue(IR& ir, Variable_Id n);
-
-
-// Load ptr
-// --------
-
-void gen_load(IR& ir, Variable_Id dest, Variable_Id src);
 
 
 // Plus op

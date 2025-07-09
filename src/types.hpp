@@ -31,7 +31,6 @@ enum Returns {
 	UnexpectedArguments,
 	UnexpectedEndOfFile,
 	InvalidSyntax,
-	UnimplementedSyntax,
 	IsThisYours,
 	VariableRedefinition,
 	FunctionRedefinition,
@@ -39,14 +38,12 @@ enum Returns {
 	ErrorReadInput,
 	ErrorWriteOutput,
 	InvalidTargetTriple,
-	ReachedUnreachable,
-	NoScopeStarted,
 	FunctionNotFound,
 	UnusedVariable,
-	UnsupportedTarget,
-	TotalAmountOfReturns,
 	ExpectedSemicolon,
 	ErrorWritingIrOfFile,
+	VariableIsShadowed,
+	TotalAmountOfReturns,
 };
 
 enum Ops {
@@ -111,11 +108,12 @@ enum Keyword {
 	Switch,
 	Case,
 	Goto,
-	Invalid,
+	Invalid_Keyword,
 };
 
 enum Value_Type {
-	UnknownIntAssumed,
+	Invalid_Value_Type = -1,
+	Dead,
 	Uninitialized,
 	Int,
 	Float,
@@ -127,18 +125,17 @@ enum Value_Type {
 typedef std::vector<const char*> CStrings;
 typedef std::string IR;
 typedef uint32_t Function_Id;
-typedef size_t Variable_Id;
+typedef ssize_t Variable_Id;
 
-constexpr Variable_Id LLVM_LOAD_OFFSET = 1;
-constexpr int CLEX_BUFFER_SIZE = 0x1000;
+constexpr int CLEX_BUFFER_DEFAULT_SIZE = 0x1000;
+constexpr int MAX_ERRORS_BEFORE_STOP = 15;
 
 typedef struct {
-	const char* name;
-	Value_Type value_type;
+	const char* name = nullptr;
+	Value_Type value_type = Dead;
 	size_t file;
-	stb_lex_location location;
-	IR ir;
-	bool inline_var;
+	stb_lex_location location = { 0, 0 };
+	IR ir = "";
 } B_Variable;
 
 typedef struct {
@@ -147,47 +144,48 @@ typedef struct {
 	stb_lex_location location;
 } B_Function;
 
-/* typedef struct {
-	B_Variable& b_var;
-	size_t llvm_ptr;
-	size_t llvm_load;
-	mutable IR decl;
-} LLVM_Variable; */
-
-/* typedef struct {
-	B_Variable b_var;
-	mutable IR decl;
-} LLVM_gVariable; */
-
 typedef std::vector<B_Variable> B_Variable_Scope;
 typedef std::vector<B_Function> B_Function_Scope;
 
 
 // POS Types
 typedef struct B_Scope {
-	static B_Function_Scope& externf;
+	static B_Function_Scope& functions; // For all files
+	static B_Function_Scope& extern_functions; // For the whole file
 	stb_lex_location lex_location;
 	B_Variable_Scope upstreamv;
-	B_Function_Scope upstreamf;
 	B_Variable_Scope localv;
-	B_Function_Scope localf;
 
-
-	B_Scope() = default;
+	B_Scope()
+	{
+		localv.push_back(B_Variable { });
+	}
 
 	B_Scope(const B_Scope& upstr)
 	{ // uuuuhhh
-		upstreamf.reserve(upstr.localf.size() + upstr.upstreamf.size());
 		upstreamv.reserve(upstr.localv.size() + upstr.upstreamv.size());
-		upstreamf.insert(upstreamf.end(), upstr.localf.begin(), upstr.localf.end());
-		upstreamf.insert(upstreamf.end(), upstr.upstreamf.begin(), upstr.upstreamf.end());
 		upstreamv.insert(upstreamv.end(), upstr.localv.begin(), upstr.localv.end());
 		upstreamv.insert(upstreamv.end(), upstr.upstreamv.begin(), upstr.upstreamv.end());
+
+		localv.push_back(B_Variable { });
 	}
 
 	~B_Scope() = default;
 } B_Scope;
 
+/* typedef struct Compiler {
+	size_t file;
+	std::vector<char>& clex_buffer;
+}; */
 
+enum Reserved_Variables : Variable_Id {
+	Bool_True = -2,
+	Bool_False,
+	INVALID_VARIABLE,
+	FIRST_VARIABLE_ID = 1,
+};
+
+constexpr Function_Id INVALID_FUNCTION = 0;
+constexpr Function_Id FIRST_FUNCTION_ID = 1;
 
 #endif

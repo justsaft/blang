@@ -5,19 +5,25 @@ extern "C" {
 }
 
 #include "types.hpp"
+#include "common.hpp"
 
-void unexpected_eof(const char* last_parsed)
+void unexpected_eof(void)
 {
-    nob_log(NOB_ERROR, "Encountered unexpected EOF while last working on >%s<", last_parsed);
+    nob_log(NOB_ERROR, "Encountered unexpected EOF");
     static_assert("Unexpected end of file.");
+}
+
+void unexpected_eof(const char* hint)
+{
+    nob_log(NOB_ERROR, "Encountered unexpected EOF while working on >%s<", hint);
+    static_assert("Unexpected end of file.");
+    exit(UnexpectedEndOfFile);
 }
 
 void step_lexer(stb_lexer& l)
 {
     if (!stb_c_lexer_get_token(&l))
-    {
-        unexpected_eof("step_lexer");
-    }
+        unexpected_eof();
 }
 
 void get_lexer_location(stb_lexer& l, stb_lex_location& lo)
@@ -32,49 +38,37 @@ long get_next_token(stb_lexer& l)
     return l.token;
 }
 
-bool get_and_expect_token(stb_lexer& l, long token)
+bool get_and_expect_token(stb_lexer& l, const long token)
 {
-    if (get_next_token(l) == token)
-    {
-        return true;
-    }
-    return false;
+    return get_next_token(l) == token;
 }
 
-bool get_and_expect_semicolon(stb_lexer& l, const char* filename, const bool advance_lexer)
+uint8_t semicolon_next(stb_lexer& l, const char* filename, bool advance_pre, bool advance_post)
 {
     stb_lex_location pos;
+
+    if (advance_pre)
+        step_lexer(l);
+
     get_lexer_location(l, pos);
 
-    long token = l.token;
-
-    /* if (!stb_c_lexer_get_token(&l))
-    {
-        nob_log(NOB_ERROR, "Unexpected EOF: expected to see semicolon.");
-        compilation_error(ExpectedSemicolon);
-        return false; // Fail
-    } */
-
-    switch (token)
-    {
+    switch (l.token) {
     case ';':
-        if (advance_lexer)
+        if (advance_post)
             step_lexer(l);
-        return true;
+        return Success;
 
     default:
         //NOB_TODO("Unwind after missing semicolon");
         nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected semicolon.", filename, pos.line_number, pos.line_offset);
-        return false; // Didn't get a semicolon
+        Compilation_error(ExpectedSemicolon);
+        return ExpectedSemicolon; // Didn't get a semicolon
     }
 }
 
 bool expect_token(stb_lexer& l, long token/* , bool silent */)
 {
-    if (l.token == token)
-    {
-        return 1;
-    }
+    return l.token == token;
     /* else if (!silent) {
         stb_lex_location lo;
         get_lexer_location(l, lo);
@@ -85,5 +79,4 @@ bool expect_token(stb_lexer& l, long token/* , bool silent */)
         if (token > 256) nob_log(NOB_ERROR, "  -> expected token: %ld", l.token);
         else nob_log(NOB_ERROR, "  -> expected token: '%c'", (char)token);
     } */
-    return 0;
 }

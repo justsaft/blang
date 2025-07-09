@@ -49,6 +49,11 @@ bool write_ll_file(const char* original_file, const char* ir, size_t ir_size)
 	const char* ll_file = swap_extension(original_file, "ll");
 	/* nob_log(NOB_INFO, "LL file name: %s", ll_file); */
 
+#if ENABLE_FILE_DELETIONS
+	if (nob_file_exists(ll_file))
+		nob_delete_file_silent(ll_file);
+#endif
+
 	if (!nob_write_entire_file(ll_file, ir, ir_size)) { // LLVM-IR Output
 		nob_log(NOB_ERROR, "Failed to write LLVM-IR for file %s", original_file);
 		return_defer(false);
@@ -137,15 +142,15 @@ char* swap_extension(const char* filename, const char* new_extension)
 /* void replace_char(char* str, char old_char, char new_char)
 {
    if (!str) {
-       nob_log(NOB_ERROR, "Null input to replace_char");
-       return;
+	   nob_log(NOB_ERROR, "Null input to replace_char");
+	   return;
    }
 
    while (*str) {
-       if (*str == old_char) {
-           *str = new_char;
-       }
-       str++;
+	   if (*str == old_char) {
+		   *str = new_char;
+	   }
+	   str++;
    }
 } */
 
