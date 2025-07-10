@@ -35,14 +35,6 @@ void version(void)
 
 void parse_cli_arguments(int argc, char** argv, std::string& target_override, std::string& output_override, CStrings& input_files, IR_Output& ir_output)
 {
-#if !defined(DEBUG)
-    if (argc < 2) {
-        nob_log(NOB_ERROR, "No arguments or input files.\n");
-        usage(argv[0]);
-        exit(NoArgumentsGiven);
-    }
-#endif
-
     bool print_target_flag = false;
 
     for (uint8_t arg = 1; arg < argc; ++arg) {

@@ -11,9 +11,6 @@ void compilation_error(Returns e, const char* compiler_file = nullptr, const int
 #define Compilation_error(e) do { compilation_error((e), __FILE__, __LINE__); } while (false)
 #define Filename input_files[file]
 
-#define DEBUG
-/* #undef DEBUG
- */
 #define ENABLE_FILE_DELETIONS
 #undef ENABLE_FILE_DELETIONS
 
