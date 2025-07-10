@@ -14,7 +14,6 @@
 #elif defined(__clang__)
 #define GPPC "clang++", "-c", "-o"
 #define GCCC "clang", "-c", "-o"
-// TODO: Clang currently doesn't get any flags. Might be nessessary for cross-compilation or debugging in the future
 #elif defined(_MSC_VER)
 #define GCCC "cl.exe", "/EHsc", "/c", "/W3", "/Zi", /*"/FS",*/ "/Fo:"
 #define GPPC "cl.exe", "/EHsc", "/c", "/W3", "/Zi", /*"/FS",*/ "/Fo:"
