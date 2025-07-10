@@ -1,0 +1,49 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		/* {
+			"type": "cmake",
+			"label": "CMake: build",
+			"command": "build",
+			"targets": [
+				"blang"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"detail": "CMake template build task"
+		}, */
+		{
+			"label": "nob build",
+			"type": "shell",
+			"windows": {
+				"command": "${workspaceFolder}/nob.exe",
+				"dependsOn": [
+					{
+						"label": "Check for nob.exe",
+						"type": "shell",
+						"command": "if not exist \"${workspaceFolder}\\nob.exe\" (echo \"nob.exe not found, please build it first\" && exit 1)"
+					}
+				],
+			},
+			"linux": {
+				"command": "${workspaceFolder}/nob",
+				"dependsOn": [
+					{
+						"label": "Check for nob",
+						"type": "shell",
+						"command": "[[ -f \"${workspaceFolder}/nob\" ]] || (cc build.c -o nob)"
+					}
+				],
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"detail": "Build with Nob task"
+		}
+	]
+}
