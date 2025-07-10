@@ -38,10 +38,10 @@ uint8_t parse_line(size_t file, B_Scope&, stb_lexer&, IR&, bool is_global_scope)
 
 // Parse functions
 Variable_Id parse_secondary_expression(stb_lexer& l, IR& ir, B_Scope& sc, const size_t file);
-uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR& ir, const bool is_gvar, const size_t file);
-void primary_secondary_intermediate(stb_lexer& l, IR& ir, B_Scope& sc, size_t file, bool is_global_scope, const char* primary);
+uint8_t parse_assigning_expression(stb_lexer&, const char* variable_name, B_Scope&, IR&, const bool is_gvar, const size_t file);
 uint8_t parse_function_definition(size_t file, B_Scope&, stb_lexer&, IR&, const char* name);
 uint8_t parse_function_call(size_t file, B_Scope&, stb_lexer&, IR&, const char* name, const bool force_retvalgen = false);
+/* void primary_secondary_intermediate(stb_lexer& l, IR& ir, B_Scope& sc, size_t file, bool is_global_scope, const char* primary); */
 
 
 // Parse keywords
@@ -53,7 +53,6 @@ uint8_t parse_return_keyword(stb_lexer& l, std::string& ir, B_Scope& sc, const s
 // Declaration
 uint8_t variable_declaration(const char* name, B_Variable_Scope&, const size_t file, const stb_lex_location&);
 uint8_t variable_declaration(const char* name, B_Variable_Scope&, const size_t file, const stb_lex_location&);
-uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id, B_Scope&, IR&, const bool is_gvar, const size_t file);
 
 
 // Find & Redefinitions
@@ -101,12 +100,10 @@ bool expect_token(stb_lexer& l, long token);
 void parse_cli_arguments(int argc, char** argv, std::string& target, std::string& output, CStrings& input_files, IR_Output&);
 
 
+#pragma region Main
+
 int main(int argc, char** argv)
 {
-#if defined(DEBUG)
-	input_files.push_back("../../b_src/return_lval.b");
-#endif
-
 	std::string output;
 	std::string current_platform = get_target_triple_clang();
 	IR_Output irout = DeleteIrAfterCompile;
@@ -165,6 +162,9 @@ int main(int argc, char** argv)
 	return Success;
 }
 
+#pragma endregion
+#pragma region Parse File
+
 uint8_t parse_file(size_t file, B_Scope& global, IR& file_ir)
 {
 	static Nob_String_Builder clex_is = { nullptr, 0, 0 }; // input stream
@@ -173,7 +173,7 @@ uint8_t parse_file(size_t file, B_Scope& global, IR& file_ir)
 	if (nob_read_entire_file(input_files[file], &clex_is)) {
 		nob_log(NOB_INFO, "Compiling %s", input_files[file]);
 	} else {
-		nob_log(NOB_ERROR, "Could not read file %s", input_files[file]);
+		// nob_log(NOB_ERROR, "Could not read file %s", input_files[file]);
 		Compilation_error(ErrorReadInput);
 		return ErrorReadInput;
 	}
@@ -210,6 +210,9 @@ uint8_t parse_file(size_t file, B_Scope& global, IR& file_ir)
 	gen_file_ir_info(file_ir, target.data(), input_files[file]);
 	return parse_scope(file, global, lexer, file_ir, false);
 }
+
+#pragma endregion
+#pragma region Parse Scopes
 
 uint8_t parse_scope(size_t file, B_Scope& scope, stb_lexer& l, IR& ir, bool is_function_scope)
 {
@@ -249,6 +252,9 @@ uint8_t parse_scope(size_t file, B_Scope& scope, stb_lexer& l, IR& ir, bool is_f
 
 	return retval;
 }
+
+#pragma endregion
+#pragma region Parse Lines
 
 uint8_t parse_line(size_t file, B_Scope& sc, stb_lexer& l, IR& ir, bool is_global_scope)
 {
@@ -290,13 +296,13 @@ uint8_t parse_line(size_t file, B_Scope& sc, stb_lexer& l, IR& ir, bool is_globa
 				retval = parse_function_definition(file, sc, l, ir, primary.data());
 				return retval; // No semicolon, skip call to semicolon_next
 			} else if ((l.token == '=') || (l.token == CLEX_id) || (l.token == CLEX_intlit) || (l.token == CLEX_floatlit) || (l.token == CLEX_dqstring)) {
-				retval = parse_assigning_expression(l, find_variable(primary.data(), sc.localv), sc, ir, is_global_scope, file);
+				retval = parse_assigning_expression(l, primary.data(), sc, ir, is_global_scope, file);
 			} else {
 				retval = parse_secondary_expression(l, ir, sc, file);
 			}
 		} else {
 			if (l.token == '=')
-				retval = parse_assigning_expression(l, find_variable(primary.data(), sc.localv), sc, ir, is_global_scope, file);
+				retval = parse_assigning_expression(l, primary.data(), sc, ir, is_global_scope, file);
 			else retval = parse_secondary_expression(l, ir, sc, file);
 		}
 		break; // -> semicolon next
@@ -309,46 +315,8 @@ uint8_t parse_line(size_t file, B_Scope& sc, stb_lexer& l, IR& ir, bool is_globa
 	return retval;
 }
 
-void primary_secondary_intermediate(stb_lexer& l, IR& ir, B_Scope& sc, size_t file, bool is_global_scope, const char* primary)
-{
-	Variable_Id src = parse_secondary_expression(l, ir, sc, file);
-	if (is_global_scope) {
-		/* gen_store_lval_to_gvar(ir, primary, src); */
-		gen_store_rval_to_gvar(ir, primary,
-							   l.token == CLEX_id ? l.string
-							   : l.token == CLEX_intlit ? std::to_string(l.int_number)
-							   : l.token == CLEX_floatlit ? std::to_string(l.real_number)
-							   : l.string);
-	} else {
-		Variable_Id dest = find_variable(primary, sc.localv);
-		gen_store_lval_to_lval(ir, dest, src);
-	}
-}
-
-Keyword get_keyword(const char* k)
-{
-	if (strcmp(k, "extrn") == 0) {
-		return Extrn;
-	} else if (strcmp(k, "auto") == 0) {
-		return Auto;
-	} else if (strcmp(k, "return") == 0) {
-		return Return;
-	} else if (strcmp(k, "switch") == 0) {
-		return Switch;
-	} else if (strcmp(k, "case") == 0) {
-		return Case;
-	} else if (strcmp(k, "if") == 0) {
-		return If;
-	} else if (strcmp(k, "else") == 0) {
-		return Else;
-	} else if (strcmp(k, "while") == 0) {
-		return While;
-	} else if (strcmp(k, "goto") == 0) {
-		return Goto;
-	} else {
-		return NoKeyword;
-	}
-}
+#pragma endregion
+#pragma region Variables
 
 uint8_t variable_declaration(const char* name, B_Variable_Scope& vsc, const size_t file, const stb_lex_location& lo)
 {
@@ -384,18 +352,71 @@ uint8_t variable_declaration(const char* name, B_Variable_Scope& vsc, const size
 	return Success;
 }
 
-uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR& ir, const bool is_gvar, const size_t file)
+Variable_Id find_variable(const char* name, const B_Variable_Scope& scope)
+{
+	if (name == nullptr)
+		NOB_UNREACHABLE("Searched for nullptr named variable");
+
+	if (strcmp(name, "false") == 0)
+		return Bool_False;
+
+	if (strcmp(name, "true") == 0)
+		return Bool_True;
+
+	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)scope.size(); ++i) {
+		if (strcmp(scope[i].name, name) == 0) {
+			return i; // Found
+		}
+	}
+
+	return INVALID_VARIABLE; // Not found
+}
+
+bool is_variable_redefinition(const B_Variable& s, const B_Variable_Scope& vsc, const size_t file)
+{
+	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)vsc.size(); ++i) {
+		if (strcmp(s.name, vsc[i].name) == 0) {
+			nob_log(NOB_ERROR, "%s:%d:%d: Variable redefinition: attempted to redefine %s", input_files[file], s.location.line_number, s.location.line_offset, s.name);
+			nob_log(NOB_ERROR, "%s:%d:%d: <--- %s is first defined here", input_files[vsc[i].file], vsc[i].location.line_number, vsc[i].location.line_offset, vsc[i].name);
+			return true;
+		}
+	}
+	return false;
+}
+
+Value_Type get_value_type(Variable_Id id, const B_Variable_Scope& scope)
+{
+	return scope[id].value_type;
+}
+
+Value_Type get_value_type_from_lval(const char* name, const B_Variable_Scope& scope)
+{
+	Variable_Id v = find_variable(name, scope);
+	if (v != INVALID_VARIABLE) {
+		return scope[v].value_type;
+	}
+	return Invalid_Value_Type;
+}
+
+#pragma endregion
+#pragma region Assigning
+
+uint8_t parse_assigning_expression(stb_lexer& l, const char* variable_name /* Variable_Id id */, B_Scope& sc, IR& ir, const bool is_gvar, const size_t file)
 {
 	// This should be the function to call when you've got `auto var = 2;` and `var = 3;` to handle the assigning part.
 	// Lexer: auto variable <<=>> asd + 1;
 	// Lexer: a <<=>> asd + 1;
 
 	if (l.token == ';')
-		NOB_UNREACHABLE("Call to `variable_assignment` was unnessesary.");
+		NOB_UNREACHABLE("Call to `variable_assignment` but next token is a semicolon.");
+
+	Variable_Id id = find_variable(variable_name, sc.localv);
 
 	if (id < FIRST_VARIABLE_ID) {
 		nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: variable `%s` wasn't declared prior to attempting to assign to it.",
-				Filename, sc.lex_location.line_number, sc.lex_location.line_offset, "TODO: var name here");
+				Filename, sc.lex_location.line_number, sc.lex_location.line_offset, variable_name);
+		Compilation_error(InvalidSyntax);
+		return InvalidSyntax;
 	}
 
 	if ((l.token != '=') && (!is_gvar)) {
@@ -409,12 +430,15 @@ uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR
 	Variable_Id working_with;
 	bool step_lexers;
 
-	step_lexer(l);
+	if (!stb_c_lexer_get_token(&l))
+		NOB_TODO("Handle eof in parse_assigning_expression");
 	// Lexer: auto variable = <<asd>> + 1;
 
 	stb_lexer la = l;
 	stb_lexer lb = l;
-	step_lexer(lb);
+
+	if (!stb_c_lexer_get_token(&lb))
+		NOB_TODO("Handle eof in parse_assigning_expression (lexer b)");
 	// Lexer B: auto variable = asd <<+>> 1;
 	// Lexer b is always 1 ahead
 
@@ -429,6 +453,18 @@ uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR
 		} else {
 			working_with = sc.localv.size();
 			step_lexers = true;
+
+			if (lb.token == '+') {
+				ops.push_back(Plus);
+			} else if (lb.token == '-') {
+				ops.push_back(Minus);
+			} else if (lb.token == '*') {
+				ops.push_back(Mult);
+			} else if (lb.token == '/') {
+				ops.push_back(Div);
+			} else {
+				NOB_UNREACHABLE("Unexpected token in inline op");
+			}
 		}
 
 		if (ops.size() > 0) {
@@ -454,18 +490,6 @@ uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR
 			default:
 				NOB_UNREACHABLE("Unknown operation");
 			}
-		}
-
-		if (lb.token == '+') {
-			ops.push_back(Plus);
-		} else if (lb.token == '-') {
-			ops.push_back(Minus);
-		} else if (lb.token == '*') {
-			ops.push_back(Mult);
-		} else if (lb.token == '/') {
-			ops.push_back(Div);
-		} else {
-			NOB_UNREACHABLE("Unexpected token in inline op");
 		}
 
 		switch (la.token) {
@@ -537,7 +561,7 @@ uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR
 
 		if (step_lexers) {
 			step_lexer(la), step_lexer(lb), step_lexer(la), step_lexer(lb);
-		}
+		} else break;
 
 	} while (true);
 
@@ -548,6 +572,34 @@ uint8_t parse_assigning_expression(stb_lexer& l, Variable_Id id, B_Scope& sc, IR
 	assert((l.token == ',') || (l.token == ';') || (l.token == ')'));
 
 	return Success;
+}
+
+#pragma endregion
+#pragma region Keywords
+
+Keyword get_keyword(const char* k)
+{
+	if (strcmp(k, "extrn") == 0) {
+		return Extrn;
+	} else if (strcmp(k, "auto") == 0) {
+		return Auto;
+	} else if (strcmp(k, "return") == 0) {
+		return Return;
+	} else if (strcmp(k, "switch") == 0) {
+		return Switch;
+	} else if (strcmp(k, "case") == 0) {
+		return Case;
+	} else if (strcmp(k, "if") == 0) {
+		return If;
+	} else if (strcmp(k, "else") == 0) {
+		return Else;
+	} else if (strcmp(k, "while") == 0) {
+		return While;
+	} else if (strcmp(k, "goto") == 0) {
+		return Goto;
+	} else {
+		return NoKeyword;
+	}
 }
 
 uint8_t parse_auto_keyword(stb_lexer& l, IR& ir, B_Scope& scope, const bool is_gvar, const size_t file)
@@ -571,7 +623,7 @@ uint8_t parse_auto_keyword(stb_lexer& l, IR& ir, B_Scope& scope, const bool is_g
 
 	case '=':
 		if (retval == Success) {
-			retval = parse_assigning_expression(l, scope.localv.size() - 1, scope, ir, is_gvar, file);
+			retval = parse_assigning_expression(l, /* scope.localv.size() - 1 */ name, scope, ir, is_gvar, file);
 		} else {
 			NOB_TODO("Stuff that's gonna happen after non succesful variable declaration");
 		}
@@ -643,25 +695,8 @@ uint8_t parse_return_keyword(stb_lexer& l, std::string& ir, B_Scope& sc, const s
 	return Success;
 }
 
-/* bool check_for_inline_ops(stb_lexer& l)
-{
-	return (bool)count_inline_ops(l);
-} */
-
-/* uint16_t count_inline_ops(stb_lexer& la)
-{
-	// Lexer pos: intlit
-	stb_lexer lb = la;
-	uint16_t r = 0;
-
-	// Lexer2 pos: , or ; -> ends loop
-	for (step_lexer(lb); (lb.token != ',') && (lb.token != ';') && (lb.token != ')'); ++r, step_lexer(la), step_lexer(lb), step_lexer(la), step_lexer(lb)) {
-		if ((la.token != CLEX_id) || (la.token != CLEX_intlit) || (la.token != CLEX_floatlit))
-			NOB_UNREACHABLE("Recieved something other");
-	}
-
-	return r;
-} */
+#pragma endregion
+#pragma region Secondary
 
 Variable_Id parse_secondary_expression(stb_lexer& l, IR& ir, B_Scope& sc, const size_t file)
 {
@@ -805,6 +840,9 @@ Variable_Id parse_secondary_expression(stb_lexer& l, IR& ir, B_Scope& sc, const 
 	return ab[ab.size() - 1];
 }
 
+#pragma endregion
+#pragma region Functions
+
 uint8_t parse_function_call(size_t file, B_Scope& sc, stb_lexer& l, IR& ir, const char* name, const bool force_retvalgen)
 {
 	// Lexer pos: (
@@ -880,13 +918,33 @@ uint8_t parse_function_definition(size_t file, B_Scope& sc, stb_lexer& l, IR& ir
 	return Success;
 }
 
+Function_Id find_function(const char* name, const B_Function_Scope& scope)
+{
+	for (Function_Id i = FIRST_FUNCTION_ID; i < scope.size(); ++i) {
+		if (strcmp(scope[i].name, name) == 0) {
+			return i;
+		}
+	}
+	return INVALID_FUNCTION;
+}
+
+bool is_function_redefinition(const B_Function& s, const B_Function_Scope& fsc, const size_t file)
+{
+	for (Function_Id i = FIRST_FUNCTION_ID; i < fsc.size() + 1; ++i) {
+		if (strcmp(s.name, fsc[i].name) == 0) {
+			nob_log(NOB_ERROR, "%s:%d:%d: Variable redefinition: attempted to redefine %s", input_files[file], s.location.line_number, s.location.line_offset, s.name);
+			nob_log(NOB_ERROR, "%s:%d:%d: <--- %s is first defined here", input_files[fsc[i].filei], fsc[i].location.line_number, fsc[i].location.line_offset, fsc[i].name);
+			return true;
+		}
+	}
+	return false;
+}
+
+#pragma endregion
+#pragma region Compilation
+
 void compilation_error(Returns e, const char* compiler_file, const int file_line)
 {
-#if !defined(DEBUG)
-	(void)compiler_file;
-	(void)file_line;
-#endif
-
 	static uint16_t error_count = 0;
 	static uint16_t warning_count = 0;
 
@@ -933,10 +991,8 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 
 	if (stop_compilation) {
 		nob_log(NOB_INFO, "Stopping compilation: %d errors, %d warnings", error_count, warning_count);
-#if defined(DEBUG)
 		if ((compiler_file != nullptr) && (file_line > -1))
 			nob_log(NOB_INFO, "%s:%d:%d: <--- compilation stopped here in compiler.", compiler_file, file_line, 1);
-#endif
 		exit(e);
 	} else return;
 }
@@ -991,70 +1047,4 @@ bool dispatch_clang(const CStrings& input_files, const std::string& output_file,
 	return false;
 }
 
-Variable_Id find_variable(const char* name, const B_Variable_Scope& scope)
-{
-	if (name == nullptr)
-		NOB_UNREACHABLE("Searched for nullptr named variable");
-
-	if (strcmp(name, "false") == 0)
-		return Bool_False;
-
-	if (strcmp(name, "true") == 0)
-		return Bool_True;
-
-	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)scope.size(); ++i) {
-		if (strcmp(scope[i].name, name) == 0) {
-			return i; // Found
-		}
-	}
-
-	return INVALID_VARIABLE; // Not found
-}
-
-Function_Id find_function(const char* name, const B_Function_Scope& scope)
-{
-	for (Function_Id i = FIRST_FUNCTION_ID; i < scope.size(); ++i) {
-		if (strcmp(scope[i].name, name) == 0) {
-			return i;
-		}
-	}
-	return INVALID_FUNCTION;
-}
-
-bool is_function_redefinition(const B_Function& s, const B_Function_Scope& fsc, const size_t file)
-{
-	for (Function_Id i = FIRST_FUNCTION_ID; i < fsc.size() + 1; ++i) {
-		if (strcmp(s.name, fsc[i].name) == 0) {
-			nob_log(NOB_ERROR, "%s:%d:%d: Variable redefinition: attempted to redefine %s", input_files[file], s.location.line_number, s.location.line_offset, s.name);
-			nob_log(NOB_ERROR, "%s:%d:%d: <--- %s is first defined here", input_files[fsc[i].filei], fsc[i].location.line_number, fsc[i].location.line_offset, fsc[i].name);
-			return true;
-		}
-	}
-	return false;
-}
-
-bool is_variable_redefinition(const B_Variable& s, const B_Variable_Scope& vsc, const size_t file)
-{
-	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)vsc.size(); ++i) {
-		if (strcmp(s.name, vsc[i].name) == 0) {
-			nob_log(NOB_ERROR, "%s:%d:%d: Variable redefinition: attempted to redefine %s", input_files[file], s.location.line_number, s.location.line_offset, s.name);
-			nob_log(NOB_ERROR, "%s:%d:%d: <--- %s is first defined here", input_files[vsc[i].file], vsc[i].location.line_number, vsc[i].location.line_offset, vsc[i].name);
-			return true;
-		}
-	}
-	return false;
-}
-
-Value_Type get_value_type(Variable_Id id, const B_Variable_Scope& scope)
-{
-	return scope[id].value_type;
-}
-
-Value_Type get_value_type_from_lval(const char* name, const B_Variable_Scope& scope)
-{
-	Variable_Id v = find_variable(name, scope);
-	if (v != INVALID_VARIABLE) {
-		return scope[v].value_type;
-	}
-	return Invalid_Value_Type;
-}
+#pragma endregion

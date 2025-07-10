@@ -97,7 +97,7 @@ void parse_function_body(
                             uint32_t destval = find_variable(lhs, vars);
                             assert(destval != 0);
                             assert(srcval != 0);
-                            gen_assignment_lval_to_lval(func_body_ir, destval, srcval);
+                            gen_store_lval_to_lval(func_body_ir, destval, srcval);
                             get_and_expect_semicolon(l);
                         }
                         else {
@@ -262,7 +262,7 @@ while (stb_c_lexer_get_token(&l)) { // For each line in this file
             f.location = location;
             f.filei = filei;
 
-            detect_symbol_redef(f, functions);
+            is_function_redefinition(f, functions);
             functions.push_back(f);
 
             if (!get_and_expect_token(l, '{')) {
@@ -322,7 +322,7 @@ while (stb_c_lexer_get_token(&l)) { // For each line in this file
                         uint32_t destval = find_variable(primary, sc.localv);
                         assert(destval != 0);
                         assert(srcval != 0);
-                        gen_assignment_lval_to_lval(ir, destval, srcval);
+                        gen_store_lval_to_lval(ir, destval, srcval);
                         get_and_expect_semicolon(l);
                     }
                     else
@@ -335,3 +335,20 @@ while (stb_c_lexer_get_token(&l)) { // For each line in this file
                     nob_log(NOB_ERROR, "%s:%d:%d: invalid syntax: unexpected token after assignment to %s", input_files[file], location.line_number, location.line_offset, primary);
                     exit(InvalidSyntax);
                 } */
+
+
+/* void primary_secondary_intermediate(stb_lexer& l, IR& ir, B_Scope& sc, size_t file, bool is_global_scope, const char* primary)
+{
+    Variable_Id src = parse_secondary_expression(l, ir, sc, file);
+    if (is_global_scope) {
+        //gen_store_lval_to_gvar(ir, primary, src);
+        gen_store_rval_to_gvar(ir, primary,
+                               l.token == CLEX_id ? l.string
+                               : l.token == CLEX_intlit ? std::to_string(l.int_number)
+                               : l.token == CLEX_floatlit ? std::to_string(l.real_number)
+                               : l.string);
+    } else {
+        Variable_Id dest = find_variable(primary, sc.localv);
+        gen_store_lval_to_lval(ir, dest, src);
+    }
+} */
