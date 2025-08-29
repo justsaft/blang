@@ -23,7 +23,7 @@
 #else
 // Linux:
 #define GCCC "gcc", FLAGS, "-o"
-#define GPPC "g++", FLAGS, "-std=c++20", "-o"
+#define GPPC "g++", FLAGS, "-std=c++23", "-o"
 #define GCCL "g++", "-o", "blang"
 
 #endif
@@ -42,58 +42,48 @@ int main(int argc, char** argv)
 
 	NOB_GO_REBUILD_URSELF(argc, argv);
 
-	if (!nob_mkdir_if_not_exists(BLD))
-	{
+	if (!nob_mkdir_if_not_exists(BLD)) {
 		nob_log(NOB_ERROR, "Could not create directory %s", BLD);
 		exit(1);
 	}
 
-#define a 8
+#define a 7
 
 	Nob_Cmd cmds[a] = { 0 };
-	nob_cmd_append(&cmds[0], GPPC, BLD"main.o", 						SRC"main.cpp");
-	nob_cmd_append(&cmds[1], GPPC, BLD"gen_ir.o", 						SRC"gen_ir.cpp");
-	nob_cmd_append(&cmds[2], GPPC, BLD"state.o", 						SRC"state.cpp");
-	nob_cmd_append(&cmds[3], GPPC, BLD"cli.o", 							SRC"cli.cpp");
-	nob_cmd_append(&cmds[4], GPPC, BLD"clex_util.o", 					SRC"clex_util.cpp");
-	nob_cmd_append(&cmds[5], GCCC, BLD"nob.o", 							SRC"nob.c");
-	nob_cmd_append(&cmds[6], GCCC, BLD"clex.o", "-Wno-unused-function",	SRC"clex.c");
-	nob_cmd_append(&cmds[7], GCCC, BLD"output.o", 						SRC"output.c");
+	nob_cmd_append(&cmds[0], GPPC, BLD"main.o", SRC"main.cpp");
+	nob_cmd_append(&cmds[1], GPPC, BLD"gen_ir.o", SRC"gen_ir.cpp");
+	nob_cmd_append(&cmds[2], GCCC, BLD"output.o", SRC"output.c");
+	nob_cmd_append(&cmds[3], GPPC, BLD"cli.o", SRC"cli.cpp");
+	nob_cmd_append(&cmds[4], GPPC, BLD"clex_util.o", SRC"clex_util.cpp");
+	nob_cmd_append(&cmds[5], GCCC, BLD"nob.o", SRC"nob.c");
+	nob_cmd_append(&cmds[6], GCCC, BLD"clex.o", "-Wno-unused-function", SRC"clex.c");
 
 	pid_t pids[a] = { 0 };
-	size_t results[a] = { 0 };
+	// size_t results[a] = { 0 };
 
-	for (int i = 0; i < a; ++i)
-	{
+	for (int i = 0; i < a; ++i) {
 		pids[i] = nob_cmd_run_async(cmds[i]);
+		free(cmds[i].items);
 	}
 
-	for (int i = 0; i < a; ++i)
-	{
+	for (int i = 0; i < a; ++i) {
 		int status = 0;
-		if (pids[i] > 0)
-		{
+		if (pids[i] > 0) {
 			waitpid(pids[i], &status, 0);
-			if (status != 0)
-			{
+			if (status != 0) {
 				compile_ok = false;
 			}
-		}
-		else
-		{
+		} else {
 			nob_log(NOB_ERROR, "Failed to start process for %s", *cmds[i].items);
 			compile_ok = false;
 		}
 	}
 
-	if (compile_ok)
-	{
-		Nob_Cmd linkcmd;
+	if (compile_ok) {
+		Nob_Cmd linkcmd = { 0 };
 		nob_cmd_append(&linkcmd, GCCL, BLD"main.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o", BLD"state.o");
 		nob_cmd_run_sync_and_reset(&linkcmd);
-	}
-	else
-	{
+	} else {
 		nob_log(NOB_ERROR, "Did not link");
 		return 1;
 	}

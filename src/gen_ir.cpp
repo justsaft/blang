@@ -8,16 +8,16 @@ extern "C" {
 #include "../3rd-party/stb_c_lexer.h"
 }
 
-/* static std::array<const char*, 4> valid_triples = {
-	"x86_64-pc-windows-msvc",
-	"x86_64-pc-windows-gnu",
-	"x86_64-unknown-linux-gnu",
-	"x86_64-pc-linux-gnu"
-}; */
-
-Function_Id find_function(const char* name, const B_Function_Scope& scope);
-Variable_Id find_variable(const char* name, const B_Variable_Scope& scope);
-
+inline std::map<Value_Type, const char*> VT_to_LLVM = {
+	{ Invalid_Value_Type, "errortype" },
+	{ Dead, "errortype" },
+	{ Uninitialized, "errortype" },
+	{ Void, "void" },
+	{ Int, "i16" },
+	{ Float, "f64" },
+	{ String, "todostr" },
+	{ Pointer, "todoptr" },
+};
 
 
 // ----------------------------
@@ -30,7 +30,7 @@ Variable_Id find_variable(const char* name, const B_Variable_Scope& scope);
 // file header
 // -----------
 
-void gen_file_ir_info(IR& ir, const char* target, const char* file_name)
+void gen_file_ir_info(LLVM_IR& ir, const char* target, const char* file_name)
 {
 	ir += "source_filename = \"";
 	ir += file_name;
@@ -41,60 +41,46 @@ void gen_file_ir_info(IR& ir, const char* target, const char* file_name)
 }
 
 
-// variables
-// ---------
+// function attributes
+// -------------------
 
-/* void gen_alloca(IR& ir, const B_Variable& svar)
+void gen_func_attr_group(LLVM_IR& ir, int group)
 {
-	NOB_UNUSED(ir);
-	NOB_UNUSED(svar);
-	NOB_TODO("Implement var declarations");
-} */
-
-void gen_all_var_decls(IR& ir, const B_Variable_Scope& vars, const CStrings& files)
-{
-	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)vars.size(); ++i)
-	{
-		if (vars[i].value_type == Uninitialized)
-		{
-			nob_log(NOB_WARNING, "%s:%d:%d: Unused variable: `%s`.", files[vars[i].file], vars[i].location.line_number, vars[i].location.line_offset, vars[i].name);
-			Compilation_error(UnusedVariable);
-		}
-		ir.append(vars[i].ir);
-	}
+	ir += "\nattributes #";
+	ir.append(std::to_string(group));
+	ir += " = {  }";
 }
 
 
 // function bodies
 // ---------------
 
-void gen_all_func_decls(IR& ir, const B_Function_Scope& s)
+void gen_all_func_decls(LLVM_IR& ir, const B_Function_Scope& scope)
 {
-	for (auto& symbol : s)
-	{
+	for (auto& function : scope) {
 		ir += "$";
-		ir += symbol.name;
+		ir.append(function.name);
 		ir += " = comdat any\n";
 	}
 }
 
-void gen_func_begin(IR& ir, const B_Function& sym)
+void gen_func_begin(LLVM_IR& ir, const B_Function& sym)
 {
-	ir += "\n; Function Attrs: noinline nounwind optnone\n";
+	ir += "\n";
+	// ir += "; Function Attrs: noinline nounwind optnone\n";
 	ir += "define dso_local i64 @";
-	ir += sym.name;
-	ir += "() {\n";
-	/* ir += "  %0 = alloca i64, align 8\n"; */
-	// TODO: future: add function parameters
-	// TODO: future: save function parameters in the IR
+	ir.append(sym.name);
+	ir += "() #";
+	ir.append(std::to_string(sym.attr_group));
+	ir += " {\n";
 }
 
-void gen_func_end(IR& ir)
+void gen_func_end(LLVM_IR& ir)
 {
 	ir += "}\n\n";
 }
 
-/* void gen_all_func_bodies(IR& ir, const B_Function_Scope& s)
+/* void gen_all_func_bodies(LLVM_IR& ir, const B_Function_Scope& s)
 {
 	for (size_t i = 0; i < s.size(); ++i) {
 		ir += s[i].ir;
@@ -108,7 +94,7 @@ void gen_func_end(IR& ir)
 // TODO: future: %3 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i64 noundef 1)
 // TODO: future: add parameters
 
-void gen_funccall(IR& ir, size_t retval_dest, const std::string& callee)
+void gen_funccall(LLVM_IR& ir, Variable_Id retval_dest, const std::string& callee)
 {
 	// %4 = call i64 @print1()
 	ir += "  %";
@@ -118,7 +104,7 @@ void gen_funccall(IR& ir, size_t retval_dest, const std::string& callee)
 	ir += "()\n";
 }
 
-void gen_funccall_extrn(IR& ir, size_t retval_dest, const std::string& callee)
+void gen_funccall_extrn(LLVM_IR& ir, Variable_Id retval_dest, const std::string& callee)
 {
 	NOB_TODO("Extrn function calls");
 	ir += "  %";
@@ -128,7 +114,7 @@ void gen_funccall_extrn(IR& ir, size_t retval_dest, const std::string& callee)
 	ir += "()\n";
 }
 
-void gen_funccall(IR& ir, const std::string& callee)
+void gen_funccall(LLVM_IR& ir, const std::string& callee)
 {
 	// call void @print1()
 	ir += "  call void @";
@@ -140,7 +126,7 @@ void gen_funccall(IR& ir, const std::string& callee)
 // function parameters
 // -------------------
 
-void gen_func_parameter(IR& ir, size_t vn)
+void gen_func_parameter(LLVM_IR& ir, size_t vn)
 {
 	NOB_UNUSED(ir);
 	NOB_UNUSED(vn);
@@ -152,7 +138,7 @@ void gen_func_parameter(IR& ir, size_t vn)
 // auto keyword
 // ------------
 
-void gen_gvar_decl(IR& ir, const B_Variable& v, const std::string& value)
+void gen_gvar_decl(LLVM_IR& ir, const B_Variable& v, const std::string& value)
 {
 	// @globvar2 = dso_local global i64 0, align 8
 	ir += "@";
@@ -162,7 +148,7 @@ void gen_gvar_decl(IR& ir, const B_Variable& v, const std::string& value)
 	ir += ", align 8\n";
 }
 
-void gen_alloca(IR& ir, Variable_Id id)
+void gen_alloca(LLVM_IR& ir, Variable_Id id)
 {
 	ir += "  %";
 	ir.append(std::to_string(id));
@@ -170,7 +156,7 @@ void gen_alloca(IR& ir, Variable_Id id)
 	ir += ", align 8\n";
 }
 
-void gen_store_gvar_dest_ptrsrc(IR& ir, const std::string& dest, const Variable_Id ptrsrc)
+void gen_store_gvar_dest_ptrsrc(LLVM_IR& ir, const std::string& dest, const Variable_Id ptrsrc)
 {
 	ir += "  store i64 ";
 	ir.append(dest);
@@ -183,7 +169,7 @@ void gen_store_gvar_dest_ptrsrc(IR& ir, const std::string& dest, const Variable_
 // assignments
 // -----------
 
-void gen_assignment_gvar_to_lvar(IR& ir, const Variable_Id dest, const std::string& src)
+void gen_assignment_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src)
 {
 	//   %1 = load i64, ptr @globvar, align 8
 	ir += "  %";
@@ -194,7 +180,7 @@ void gen_assignment_gvar_to_lvar(IR& ir, const Variable_Id dest, const std::stri
 	// yields a pointer!
 }
 
-void gen_store_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value)
+void gen_store_rval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& value)
 {
 	// store i64 45, ptr @globvar2, align 8
 	ir += "  store i64 ";
@@ -204,7 +190,7 @@ void gen_store_rval_to_gvar(IR& ir, const std::string& dest, const std::string& 
 	ir += ", align 8\n";
 }
 
-void gen_store_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src)
+void gen_store_lval_to_gvar(LLVM_IR& ir, const std::string& dest, const Variable_Id src)
 {
 	// store i64 45, ptr @globvar2, align 8
 	ir += "  store i64 %";
@@ -214,7 +200,16 @@ void gen_store_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id s
 	ir += ", align 8\n";
 }
 
-void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value)
+void gen_store_gval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& src)
+{
+	ir += "  store i64 @";
+	ir.append(src);
+	ir += ", ptr @";
+	ir.append(dest);
+	ir += ", align 8\n";
+}
+
+void gen_store_rval_to_lval(LLVM_IR& ir, const Variable_Id dest, const std::string& value)
 {
 	/*
 	%ptr = alloca i64                               ; yields ptr -- var decl
@@ -233,7 +228,7 @@ void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& v
 	ir += " = load i64, ptr %";
 	ir += dest;
 	ir += ", align 8\n"; */
-	/* Reassigning is possible:
+	/* Reusing data storage?
 	  store i64 1, ptr % 2, align 8
 	  store i64 % 11, ptr % 2, align 8 */
 
@@ -244,17 +239,18 @@ void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& v
 	ir += ", align 8\n";
 }
 
-void gen_store_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+void gen_store_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
 {
-	// %1 = load i64* %2, align 8
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = store i64 %";
+	// ir += "  %";
+	// ir += " = store i64 %";
+	ir += "  store i64 %";
 	ir.append(std::to_string(src));
+	ir += ", ptr %";
+	ir.append(std::to_string(dest));
 	ir += ", align 8\n";
 }
 
-void gen_load_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+void gen_load_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
 {
 	ir += "  %";
 	ir.append(std::to_string(dest));
@@ -263,7 +259,7 @@ void gen_load_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src
 	ir += ", align 8\n";
 }
 
-void gen_load_lvalptr_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src)
+void gen_load_lvalptr_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
 {
 	// %1 = load i64* %2, align 8
 	ir += "  %";
@@ -277,19 +273,19 @@ void gen_load_lvalptr_to_lval(IR& ir, const Variable_Id dest, const Variable_Id 
 // return keyword
 // --------------
 
-void gen_return_keyword(IR& ir)
+void gen_return_keyword(LLVM_IR& ir)
 {
 	ir += "  ret i64 0\n";
 }
 
-void gen_return_keyword_rvalue(IR& ir, const std::string& n)
+void gen_return_keyword_rvalue(LLVM_IR& ir, const std::string& n)
 {
 	ir += "  ret i64 ";
 	ir.append(n);
 	ir += "\n";
 }
 
-void gen_return_keyword_lvalue(IR& ir, Variable_Id n)
+void gen_return_keyword_lvalue(LLVM_IR& ir, Variable_Id n)
 {
 	ir += "  ret i64 %";
 	ir.append(std::to_string(n));
@@ -316,164 +312,122 @@ void gen_return_keyword_lvalue(IR& ir, Variable_Id n)
   store i64 %15, ptr %2, align 8 // result
  */
 
- // lvalue = lvalue + lvalue
-void gen_plus_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right)
+void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Variable_Scope& sc, const Ops op)
 {
-	// add
 	ir += "  %";
 	ir.append(std::to_string(dest));
-	ir += " = add i64 %";
+	ir += " = ";
+
+	Value_Type& dest_type = sc.at(dest).value_type;
+	Value_Type vta = sc.at(left).value_type;
+	Value_Type vtb = sc.at(right).value_type;
+
+	switch ((vta == Int << 3) +
+			(vta == Float << 2) +
+			(vtb == Int << 1) +
+			(vtb == Float << 0)) {
+
+		case 0b1110:
+		case 0b1111:
+		case 0b0111:
+		case 0b1100:
+		case 0b0011: NOB_UNREACHABLE("Bogus amogus");
+
+		case 0b0000:
+		case 0b1000:
+		case 0b0001: NOB_TODO("At least one is not an integer or float");
+
+		case 0b0101:
+		case 0b1010: dest_type = vta; break;
+
+		case 0b0110:
+		case 0b1001: switch (dest_type) {
+			case Uninitialized: dest_type = Float; break;
+
+			case Int:
+			case Float: break;
+
+			default: NOB_TODO("Destination wasn't float, int or uninitialized");
+		}
+	}
+
+	static std::array<const char*, 10> instr = {
+		"add", "fadd",
+		"sub", "fsub",
+		"mul", "fmul",
+		"sdiv", "fdiv",
+		"srem", "frem", };
+
+	bool is_float = dest_type == Float;
+
+	ir += " ";
+	ir.append(VT_to_LLVM.at(sc.at(dest).value_type));
+
+	switch (op) {
+		case Plus: ir.append(instr[0 + is_float]); break;
+		case Minus: ir.append(instr[2 + is_float]); break;
+		case Mult: ir.append(instr[4 + is_float]); break;
+		case Div: ir.append(instr[6 + is_float]); break;
+		case Mod: ir.append(instr[8 + is_float]); break;
+		default: NOB_UNREACHABLE("Unknown operation");
+	}
+
+	ir += " %";
 	ir.append(std::to_string(left));
 	ir += ", %";
 	ir.append(std::to_string(right));
 	ir += "\n";
 }
 
-// lvalue = lvalue + rvalue
-void gen_plus_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right)
+void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Variable_Scope& sc, const Ops op)
 {
+	Value_Type& dest_vt = sc.at(dest).value_type;
+	dest_vt = sc.at(src).value_type;
 
-	// add
 	ir += "  %";
 	ir.append(std::to_string(dest));
-	ir += " = add i64 %";
-	ir.append(std::to_string(left));
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
-}
+	ir += " = ";
 
-// lvalue = rvalue + rvalue
-void gen_plus_op(IR& ir, Variable_Id dest, std::string& left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = add i64 ";
-	ir.append(left);
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
-}
+	switch (op) {
+		case UnaryBoolean:
+		case UnaryMinus: ir += "fneg"; break;
+		default: NOB_UNREACHABLE("gen_unary_op: passed operation not handled by this function.");
+	}
 
+	switch (dest_vt) {
+		case Float:
+		case Int: ir.append(VT_to_LLVM.at(dest_vt)); break;
+		default: NOB_UNREACHABLE("Unknown operation");
+	}
 
-// Minus op
-// --------
-
-void gen_minus_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = sub i64 %";
-	ir.append(std::to_string(left));
-	ir += ", %";
-	ir.append(std::to_string(right));
-	ir += "\n";
-}
-
-void gen_minus_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = sub i64 %";
-	ir.append(std::to_string(left));
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
-}
-
-void gen_minus_op(IR& ir, Variable_Id dest, std::string& left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = sub i64 ";
-	ir.append(left);
-	ir += ", ";
-	ir.append(right);
+	ir += " %";
+	ir.append(std::to_string(src));
 	ir += "\n";
 }
 
 
-// Multiplication op
-// -----------------
+// Casting
+// -------
 
-void gen_mul_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right)
+void gen_downsize_cast(LLVM_IR& ir, Variable_Id dest, Variable_Id src)
 {
-	// %12 = mul i64 %10, %11
+	//%12 = trunc i64 %11 to i32
 	ir += "  %";
 	ir.append(std::to_string(dest));
-	ir += " = mul i64 ";
-	ir.append(std::to_string(left));
-	ir += ", %";
-	ir.append(std::to_string(right));
-	ir += "\n";
-}
-
-void gen_mul_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = mul i64 %";
-	ir.append(std::to_string(left));
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
-}
-
-void gen_mul_op(IR& ir, Variable_Id dest, std::string& left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = mul i64 ";
-	ir.append(left);
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
+	ir += " = trunc i64 %";
+	ir.append(std::to_string(src));
+	ir += " to i32\n";
 }
 
 
-// Division op
-// -----------
+// Attribute Groups
+// ----------------
 
-void gen_udiv_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right)
+void gen_attr_group(LLVM_IR& ir, int group)
 {
-	// %12 = mul i64 %10, %11
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = udiv i64 ";
-	ir.append(std::to_string(left));
-	ir += ", %";
-	ir.append(std::to_string(right));
-	ir += "\n";
-}
-
-void gen_udiv_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = udiv i64 %";
-	ir.append(std::to_string(left));
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
-}
-
-void gen_udiv_op(IR& ir, Variable_Id dest, std::string& left, std::string& right)
-{
-	// add
-	ir += "  %";
-	ir.append(std::to_string(dest));
-	ir += " = udiv i64 ";
-	ir.append(left);
-	ir += ", ";
-	ir.append(right);
-	ir += "\n";
+	ir.append("\nattributes #");
+	ir.append(std::to_string(group));
+	ir.append(" = { noinline nounwind optnone uwtable \"frame-pointer\"=\"all\" \"min-legal-vector-width\"=\"0\" \"no-trapping-math\"=\"true\" \"stack-protector-buffer-size\"=\"8\" \"tune-cpu\"=\"generic\" }\n");
 }
 
 /* %17 = trunc i64 %16 to i32

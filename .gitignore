@@ -17,3 +17,4 @@ nob
 *.cmake
 CMakeCache.txt
 *.ll
+.vscode/settings.json

@@ -2,6 +2,8 @@
 #ifndef _OUTPUT_H
 #define _OUTPUT_H
 
+#include <stdbool.h>
+
 enum Stage {
     COMPILE,
     LINK
@@ -10,9 +12,8 @@ enum Stage {
 char* swap_extension(const char* filename, const char* new_extension);
 char* chop_extension(const char* filename);
 char* strconcat(const char* s1, const char* s2);
-/* void replace_char(char* str, char old_char, char new_char); */
-bool run_clang(const char* output_file, const char* original_file, int stage);
-
+bool run_clang(const char* output_file, const char* args);
+bool write_ll_file(const char* original_file, const char* ir, size_t ir_size);
 
 
 #endif

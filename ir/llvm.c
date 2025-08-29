@@ -2,8 +2,11 @@
 /* #include <stdio.h> */
 #include <stdint.h>
 
-/* uint64_t globvar = 54;
-uint64_t globvar2; */
+const int a = 4;
+const int b = 5;
+
+uint64_t globvar = 54;
+uint64_t globvar2 = a + b;
 
 uint64_t print1()
 {

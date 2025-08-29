@@ -3,6 +3,11 @@ source_filename = "llvm.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
 
+@a = dso_local constant i32 4, align 4
+@b = dso_local constant i32 5, align 4
+@globvar = dso_local global i64 54, align 8
+@globvar2 = dso_local global i64 9, align 8
+
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i64 @print1() #0 {
   ret i64 69

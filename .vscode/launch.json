@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/blang",
-            "args": [ "../b_src/return_lval.b" ],
+            "args": [ "../b_src/031-addtest2.b" ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "preLaunchTask": "nob build",

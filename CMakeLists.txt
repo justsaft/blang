@@ -17,7 +17,6 @@ set(BLD_DIR "${CMAKE_BINARY_DIR}/build")
 set(CPP_SOURCES
     ${SRC_DIR}/main.cpp
     ${SRC_DIR}/gen_ir.cpp
-    ${SRC_DIR}/state.cpp
     ${SRC_DIR}/cli.cpp
     ${SRC_DIR}/clex_util.cpp
 )
@@ -29,14 +28,17 @@ set(C_SOURCES
     ${SRC_DIR}/output.c
 )
 
+file(GLOB HEADER_FILES
+    "${SRC_DIR}/*.h"
+    "${SRC_DIR}/*.hpp"
+)
+
 # Add executable for blang
 add_executable(blang
     ${CPP_SOURCES}
     ${C_SOURCES}
+    ${HEADER_FILES}
 )
-
-# Set C++ standard for target.cpp (uses C++11)
-set_source_files_properties(${SRC_DIR}/target.cpp PROPERTIES COMPILE_FLAGS "-std=c++11")
 
 # Set compile options for C and C++
 target_compile_options(blang PRIVATE -Wall -Wextra -ggdb)

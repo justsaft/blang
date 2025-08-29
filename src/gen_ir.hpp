@@ -2,95 +2,79 @@
 #ifndef _GEN_IR_HPP
 #define _GEN_IR_HPP
 
+#include "types.hpp"
+extern Compilation compilation;
+
 
 // gen_ir.cpp
 
 
 // file header
 // -----------
-void gen_file_ir_info(IR& ir, const char* target, const char* file_name);
-
-
-// variables
-// ---------
-void gen_all_var_decls(IR& ir, const B_Variable_Scope& s, const CStrings& files);
+void gen_file_ir_info(LLVM_IR& ir, const char* target, const char* file_name);
 
 
 // function bodies
 // ---------------
-void gen_all_func_decls(IR& ir, const B_Function_Scope& s);
-void gen_func_begin(IR& ir, const B_Function& sym);
-void gen_func_end(IR& ir);
+void gen_all_func_decls(LLVM_IR& ir, const B_Function_Scope& s);
+void gen_func_begin(LLVM_IR& ir, const B_Function& sym);
+void gen_func_end(LLVM_IR& ir);
 
 
 // function calls
 // --------------
-void gen_funccall(IR& ir, const std::string& callee);
-void gen_funccall(IR& ir, size_t retval_dest, const std::string& callee);
-void gen_funccall_extrn(IR& ir, size_t retval_dest, const std::string& callee);
+void gen_funccall(LLVM_IR& ir, const std::string& callee);
+void gen_funccall(LLVM_IR& ir, Variable_Id retval_dest, const std::string& callee);
+void gen_funccall_extrn(LLVM_IR& ir, Variable_Id retval_dest, const std::string& callee);
 
 
 // function parameters
 // -------------------
-void gen_func_parameter(IR& ir, size_t vn);
+void gen_func_parameter(LLVM_IR& ir, size_t vn);
 
 
 // auto keyword
 // ------------
-void gen_alloca(IR& ir, Variable_Id vn);
-void gen_store_gvar_dest_ptrsrc(IR& ir, const std::string& dest, const Variable_Id ptrsrc);
-void gen_gvar_decl(IR& ir, const B_Variable& v, const std::string& value);
+void gen_alloca(LLVM_IR& ir, Variable_Id vn);
+void gen_store_gvar_dest_ptrsrc(LLVM_IR& ir, const std::string& dest, const Variable_Id ptrsrc);
+void gen_gvar_decl(LLVM_IR& ir, const B_Variable& v, const std::string& value);
 
 
 // assignments
 // -----------
-void gen_store_rval_to_gvar(IR& ir, const std::string& dest, const std::string& value);
-void gen_store_rval_to_lval(IR& ir, const Variable_Id dest, const std::string& value);
-void gen_store_lval_to_gvar(IR& ir, const std::string& dest, const Variable_Id src);
-void gen_store_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
-void gen_assignment_gvar_to_lvar(IR& ir, const Variable_Id dest, const std::string& src);
-void gen_load_lval_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
-void gen_load_lvalptr_to_lval(IR& ir, const Variable_Id dest, const Variable_Id src);
+void gen_store_rval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& value);
+void gen_store_rval_to_lval(LLVM_IR& ir, const Variable_Id dest, const std::string& value);
+void gen_store_lval_to_gvar(LLVM_IR& ir, const std::string& dest, const Variable_Id src);
+void gen_store_gval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& src);
+void gen_store_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
+void gen_assignment_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src);
+void gen_load_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
+void gen_load_lvalptr_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
 
 
 // return keyword
 // --------------
-void gen_return_keyword(IR& ir);
-void gen_return_keyword_rvalue(IR& ir, const std::string& n);
-void gen_return_keyword_lvalue(IR& ir, Variable_Id n);
+void gen_return_keyword(LLVM_IR& ir);
+void gen_return_keyword_rvalue(LLVM_IR& ir, const std::string& n);
+void gen_return_keyword_lvalue(LLVM_IR& ir, Variable_Id n);
 
 
-// Plus op
+// Operations
+// ----------
+
+void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Variable_Scope& sc, const Ops op);
+void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Variable_Scope& sc, const Ops op);
+
+// Casting
 // -------
 
-void gen_plus_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right);
-void gen_plus_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right);
-void gen_plus_op(IR& ir, Variable_Id dest, std::string& left, std::string& right);
+void gen_downsize_cast(LLVM_IR& ir, Variable_Id dest, Variable_Id src);
 
 
-// Minus op
-// --------
+// Attribute Groups
+// ----------------
 
-void gen_minus_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right);
-void gen_minus_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right);
-void gen_minus_op(IR& ir, Variable_Id dest, std::string& left, std::string& right);
-
-
-// Multiplication op
-// -----------------
-void gen_mul_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right);
-void gen_mul_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right);
-void gen_mul_op(IR& ir, Variable_Id dest, std::string& left, std::string& right);
-
-
-// Division op
-// -----------
-
-void gen_udiv_op(IR& ir, Variable_Id dest, Variable_Id left, Variable_Id right);
-void gen_udiv_op(IR& ir, Variable_Id dest, Variable_Id left, std::string& right);
-void gen_udiv_op(IR& ir, Variable_Id dest, std::string& left, std::string& right);
-
-
+void gen_attr_group(LLVM_IR& ir, int group);
 
 
 #endif
