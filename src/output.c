@@ -49,8 +49,8 @@ char* strconcat(const char* s1, const char* s2)
 		return NULL;
 	}
 
-	int len = strlen(s1) + strlen(s2) + 1;
-	char* result = malloc(len);
+	size_t len = strlen(s1) + strlen(s2) + 1;
+	char* result = (char*)malloc(len);
 	if (!result) {
 		nob_log(NOB_ERROR, "Memory allocation failed in strconcat");
 		return NULL;
@@ -83,11 +83,11 @@ char* chop_extension(const char* filename)
 		return NULL;
 	}
 
-	char* dot = strrchr(filename, '.');
+	char* dot = (char*)strrchr(filename, '.');
 
 	if (dot) {
 		size_t len = dot - filename;
-		char* result = malloc(len + 1);
+		char* result = (char*)malloc(len + 1);
 		if (!result) {
 			nob_log(NOB_ERROR, "Memory allocation failed in chop_extension");
 			return NULL;
@@ -111,7 +111,7 @@ char* swap_extension(const char* filename, const char* new_extension)
 		return NULL;
 	}
 	size_t len = strlen(base) + strlen(new_extension) + 2; // +1 for the dot and +1 for the null-terminator
-	char* result = malloc(len);
+	char* result = (char*)malloc(len);
 	if (!result) {
 		nob_log(NOB_ERROR, "Memory allocation failed in swap_extension");
 		free(base);
