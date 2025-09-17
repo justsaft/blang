@@ -1,30 +1,45 @@
 
 #define NOB_IMPLEMENTATION
+#if !defined(_WIN32)
 #define NOB_EXPERIMENTAL_DELETE_OLD
+#endif
 #include "3rd-party/nob.h"
 
-#define FLAGS "-c", "-Wall", "-Wextra", "-ggdb"
 
-#if _WIN32
-// Windows:
 #if defined(__GNUC__)
-#define GCCC "gcc", FLAGS, "-o"
-#define GPPC "g++", FLAGS, "-o"
-#define GCCL "g++", "-o", "blang"
-#elif defined(__clang__)
-#define GPPC "clang++", "-c", "-o"
-#define GCCC "clang", "-c", "-o"
-#elif defined(_MSC_VER)
-#define GCCC "cl.exe", "/EHsc", "/c", "/W3", "/Zi", /*"/FS",*/ "/Fo:"
-#define GPPC "cl.exe", "/EHsc", "/c", "/W3", "/Zi", /*"/FS",*/ "/Fo:"
-#define GCCL "link.exe", "/NOLOGO", "/OUT:blang.exe"
+#define LESS_WARNS "-Wno-unused-function"
+#define WARNS "-Wno-missing-field-initializers"
+#define DEBUG debug ? "-ggdb" : "", debug ? "-DDEBUG" : ""
+#define FLAGS "-Wall", "-Wextra", "-c"
+#define CC "gcc", DEBUG, FLAGS, WARNS, "-std=c11", "-o"
+#define CXXC "g++", DEBUG, FLAGS, WARNS, "-std=c++23", "-o"
+
+#ifdef _WIN32
+#define LINK "g++", "-o", "blang.exe"
+#else
+#define LINK "g++", "-o", "blang"
 #endif
 
+#elif defined(__clang__)
+#define LESS_WARNS "-Wno-unused-function"
+#define WARNS "-Wno-deprecated-declarations", "-Wno-non-c-typedef-for-linkage"
+#define DEBUG debug ? "-g" : ""
+#define FLAGS "-c"
+#define CC "clang", DEBUG, FLAGS, WARNS, "-std=c11", "-o"
+#define CXXC "clang++", DEBUG, FLAGS, WARNS, "-std=c++23", "-o"
+
+#ifdef _WIN32
+#define LINK "clang++", "-o", "blang.exe"
 #else
-// Linux:
-#define GCCC "gcc", FLAGS, "-o"
-#define GPPC "g++", FLAGS, "-std=c++23", "-o"
-#define GCCL "g++", "-o", "blang"
+#define LINK "clang++", "-o", "blang"
+#endif
+
+#elif defined(_MSC_VER)
+#define WARNS "/W3"
+#define DEBUG debug ? "/Zi" : ""
+#define CC "cl.exe", "/EHsc", "/permissive-", WARNS, DEBUG, "/c", /*"/FS",*/ "/std:c11", "/Fo:"
+#define CXXC "cl.exe", "/EHsc", "/permissive-", WARNS, DEBUG, "/c", /*"/FS",*/ "/std:c++20", "/Fo:"
+#define LINK "link.exe", "/NOLOGO", "/OUT:blang.exe"
 
 #endif
 
@@ -33,59 +48,60 @@
 #define SRC "src/"
 #define BLD "build/"
 
+
+#define a 7
+Nob_Procs procs = { 0 };
+Nob_Cmd cmds[a] = { 0 };
+Nob_Cmd linkcmd = { 0 };
+
 // B Compiler
-#define BC "blang.exe", "-o", BLD"main.ll"
+#define BC "blang.exe", "-o", BLD"main.ll", "b_src/main.b"
 
 int main(int argc, char** argv)
 {
-	bool compile_ok = true;
-
 	NOB_GO_REBUILD_URSELF(argc, argv);
+
+	bool compile_ok = true;
+	bool debug = false;
+
+	for (int arg = 1; arg < argc; ++arg) {
+		if (strcmp("--debug", argv[arg]) == 0) {
+			debug = true;
+		}
+	}
 
 	if (!nob_mkdir_if_not_exists(BLD)) {
 		nob_log(NOB_ERROR, "Could not create directory %s", BLD);
 		exit(1);
 	}
 
-#define a 7
-
-	Nob_Cmd cmds[a] = { 0 };
-	nob_cmd_append(&cmds[0], GPPC, BLD"main.o", SRC"main.cpp");
-	nob_cmd_append(&cmds[1], GPPC, BLD"gen_ir.o", SRC"gen_ir.cpp");
-	nob_cmd_append(&cmds[2], GCCC, BLD"output.o", SRC"output.c");
-	nob_cmd_append(&cmds[3], GPPC, BLD"cli.o", SRC"cli.cpp");
-	nob_cmd_append(&cmds[4], GPPC, BLD"clex_util.o", SRC"clex_util.cpp");
-	nob_cmd_append(&cmds[5], GCCC, BLD"nob.o", SRC"nob.c");
-	nob_cmd_append(&cmds[6], GCCC, BLD"clex.o", "-Wno-unused-function", SRC"clex.c");
-
-	pid_t pids[a] = { 0 };
-	// size_t results[a] = { 0 };
+	nob_cmd_append(&cmds[0], CXXC, BLD"main.o", SRC"main.cpp");
+	nob_cmd_append(&cmds[1], CXXC, BLD"gen_ir.o", SRC"gen_ir.cpp");
+	nob_cmd_append(&cmds[2], CXXC, BLD"cli.o", SRC"cli.cpp");
+	nob_cmd_append(&cmds[3], CXXC, BLD"clex_util.o", SRC"clex_util.cpp");
+	nob_cmd_append(&cmds[4], CC, BLD"output.o", SRC"output.c");
+	nob_cmd_append(&cmds[5], CC, BLD"nob.o", SRC"nob.c");
+	nob_cmd_append(&cmds[6], CC, BLD"clex.o", LESS_WARNS, SRC"clex.c");
 
 	for (int i = 0; i < a; ++i) {
-		pids[i] = nob_cmd_run_async(cmds[i]);
-		free(cmds[i].items);
-	}
-
-	for (int i = 0; i < a; ++i) {
-		int status = 0;
-		if (pids[i] > 0) {
-			waitpid(pids[i], &status, 0);
-			if (status != 0) {
-				compile_ok = false;
-			}
-		} else {
-			nob_log(NOB_ERROR, "Failed to start process for %s", *cmds[i].items);
+		if (!nob_cmd_run(&cmds[i], .async = &procs)) {
 			compile_ok = false;
 		}
 	}
 
-	if (compile_ok) {
-		Nob_Cmd linkcmd = { 0 };
-		nob_cmd_append(&linkcmd, GCCL, BLD"main.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o", BLD"state.o");
-		nob_cmd_run_sync_and_reset(&linkcmd);
-	} else {
-		nob_log(NOB_ERROR, "Did not link");
-		return 1;
+	nob_cmd_append(&linkcmd, LINK, BLD"main.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o");
+
+	for (int i = 0; i < a; ++i) {
+		if (!nob_procs_wait_and_reset(&procs)) {
+			compile_ok = false;
+		}
 	}
+
+	if (!compile_ok) {
+		nob_log(NOB_ERROR, "Did not link");
+		return -1;
+	}
+
+	nob_cmd_run_sync_and_reset(&linkcmd);
 	return 0;
 }
