@@ -73,8 +73,6 @@ local std::string target;
 Keyword check_keyword_identifier(const char* k);
 Value_Type get_value_type(Variable_Id, const B_Variable_Scope& scope);
 Value_Type get_value_type_from_lval(const char* name, const B_Variable_Scope& scope);
-uint16_t count_inline_ops(stb_lexer&);
-bool check_for_inline_ops(stb_lexer&);
 
 
 // Lexer Util (clex_util.cpp)
@@ -121,7 +119,7 @@ int main(int argc, char** argv)
 	Lexer lexer;
 	LLVM_IR file_ir;
 
-	for (size_t file = 0; file < input_files.size(); file_ir.clear(), ++file) { // For each file
+	for (int file = 0; file < (int)input_files.size(); file_ir.clear(), ++file) { // For each file
 
 		input_files[file].state = (Returns)
 			// parse_file parses until end of file
@@ -133,15 +131,14 @@ int main(int argc, char** argv)
 		if (compilation.stop)
 			break;
 
-		else if (!write_ll_file(File, file_ir.data(), file_ir.size())) {
-			nob_log(NOB_WARNING, "Couldn't write LLVM_IR for file %s", File);
+		else if (!write_ll_file(CurrentFile, file_ir.data(), file_ir.size())) {
+			nob_log(NOB_WARNING, "Couldn't write LLVM_IR for file %s", CurrentFile);
 			Compilation_error(ErrorWritingIrOfFile);
 			break;
 		}
 	}
 
-	if ((!compilation.errors) &&
-		(!dispatch_clang(output)))
+	if ((!compilation.errors) && (!dispatch_clang(output)))
 		Compilation_error(ClangNonZeroExitcode);
 
 	return compilation.state;
@@ -152,15 +149,19 @@ int main(int argc, char** argv)
 
 uint8_t parse_file(const int file, B_Scope& global, LLVM_IR& file_ir, Lexer& lexer)
 {
-	gen_file_ir_info(file_ir, target.data(), File);
+	gen_file_ir_info(file_ir, target.data(), CurrentFile);
 	uint8_t retval = Success;
 
-	retval = lexer.InitAndLoadFile(File);
+	retval =
+		lexer.InitAndLoadFile(CurrentFile);
+
 	if (retval != Success) {
-		file_ir.append("\n\n;There was an error parsing the source file.");
+		file_ir.append("\n\n; There was an error reading the source file.");
 		return retval;
 	}
 
+	// Setup
+	setup_ir_gen(compilation);
 	global.extern_functions.clear();
 
 	LLVM_IR inner;
@@ -284,22 +285,20 @@ uint8_t parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir, bool is_g
 						   l.Expect(CLEX_intlit) ||
 						   l.Expect(CLEX_floatlit) ||
 						   l.Expect(CLEX_dqstring)) {
+
 					if (l.Expect('='))
 						l.Step();
 
-					retval =
-						parse_assigning_expression(l, primary, sc, ir, is_global_scope, file);
+					retval = parse_assigning_expression(l, primary, sc, ir, is_global_scope, file);
+
 				} else {
-					retval =
-						parse_secondary_expression(l, ir, sc, file);
+					retval = parse_secondary_expression(l, ir, sc, file) != INVALID_VARIABLE ? Success : EverythingCouldBeWrong;
 				}
 			} else {
 				if (l.Expect('='))
-					retval =
-					parse_assigning_expression(l, primary, sc, ir, is_global_scope, file);
+					retval = parse_assigning_expression(l, primary, sc, ir, is_global_scope, file);
 				else
-					retval =
-					parse_secondary_expression(l, ir, sc, file);
+					retval = parse_secondary_expression(l, ir, sc, file) != INVALID_VARIABLE ? Success : EverythingCouldBeWrong;
 			}
 			break; // -> semicolon next
 
@@ -321,7 +320,7 @@ uint8_t variable_declaration(const char* name, B_Variable_Scope& vsc, const int 
 	B_Variable var {
 		.name = strdup(name),
 		.value_type = Uninitialized,
-		.file = file,
+		.in_file = file,
 		.location = lo,
 		.global = is_gvar };
 
@@ -343,7 +342,7 @@ uint8_t variable_declaration(const char* name, B_Variable_Scope& vsc, const int 
 {
 	var.name = strdup(name);
 	var.location = lo;
-	var.file = file;
+	var.in_file = file;
 	var.value_type = Uninitialized;
 	var.global = is_gvar;
 
@@ -369,7 +368,7 @@ Variable_Id find_variable(const char* name, const B_Variable_Scope& scope)
 	if (strcmp(name, "true") == 0)
 		return Special_Expr_True;
 
-	for (Variable_Id i = (signed)scope.size() - 1; i >= FIRST_VARIABLE_ID; ++i) {
+	for (Variable_Id i = static_cast<Variable_Id>(scope.size()) - 1; i >= FIRST_VARIABLE_ID; --i) {
 		if (!scope[i].name)
 			continue;
 
@@ -382,12 +381,12 @@ Variable_Id find_variable(const char* name, const B_Variable_Scope& scope)
 
 bool is_variable_redefinition(const B_Variable& s, const B_Variable_Scope& vsc, const int file)
 {
-	for (Variable_Id i = FIRST_VARIABLE_ID; i < (signed)vsc.size(); ++i) {
+	for (Variable_Id i = FIRST_VARIABLE_ID; i < static_cast<Variable_Id>(vsc.size()); ++i) {
 		if (strcmp(s.name, vsc[i].name) == 0) {
 			nob_log(NOB_ERROR, "%s:%d:%d: Variable redefinition: attempted to redefine %s",
-					File, s.location.line_number, s.location.line_offset, s.name);
+					CurrentFile, s.location.line_number, s.location.line_offset, s.name);
 			nob_log(NOB_ERROR, "%s:%d:%d: <--- %s is first defined here",
-					input_files[vsc[i].file].filepath,
+					input_files[vsc[i].in_file].filepath,
 					vsc[i].location.line_number,
 					vsc[i].location.line_offset,
 					vsc[i].name);
@@ -417,7 +416,7 @@ void backpatch_all_var_decls(LLVM_IR& ir, const B_Variable_Scope& vars)
 		switch (i.value_type) {
 			case Uninitialized:
 				nob_log(NOB_WARNING, "%s:%d:%d: Uninitialized variable: `%s`.",
-						input_files[i.file].filepath, i.location.line_number, i.location.line_offset, i.name);
+						input_files[i.in_file].filepath, i.location.line_number, i.location.line_offset, i.name);
 				Compilation_error(UnusedVariable);
 				break;
 
@@ -452,7 +451,7 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 
 	Variable_Id outcome_id = find_variable(variable_name, sc.localv);
 
-	if (outcome_id < FIRST_VARIABLE_ID) {
+	if (outcome_id == INVALID_VARIABLE) {
 		nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: variable `%s` wasn't declared prior to attempting to assign to it.",
 				l.filename, l.location.line_number, l.location.line_offset, variable_name);
 		Compilation_error(InvalidSyntax);
@@ -463,7 +462,7 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 
 	switch (l.token) {
 		case '=': op = Ops::Equals; break;
-		default: if (compilation.langfeatures == Compilation::Modernized) switch (l.token) {
+		default: if (compilation.IsLangMode(Modernized)) switch (l.token) {
 			case CLEX_minuseq: op = Ops::MinusEquals; break;
 			case CLEX_pluseq: op = Ops::PlusEquals; break;
 			case CLEX_muleq: op = Ops::MultEquals; break;
@@ -478,14 +477,18 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 	if (!op && !asgn_to_gvar) {
 		nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected `=` after variable named `%s` but got `%s`.",
 				l.filename, l.location.line_number, l.location.line_offset,
-				variable_name, l.GetTokenForText());
+				variable_name, l.GetTokenForText().c_str());
 		Compilation_error(InvalidSyntax);
 		return InvalidSyntax;
 	}
 
-	// assert(strcmp(variable_name, sc.localv.at(outcome_id).name) == 0); // For fun
-
+#if defined(DEBUG)
 	constexpr bool debug = false;
+#else
+	constexpr bool debug = true;
+#endif
+
+	// assert(strcmp(variable_name, sc.localv.at(outcome_id).name) == 0); // For fun
 	bool step_lexers = true;
 
 	std::vector<Variable_Id> ab;
@@ -525,14 +528,14 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 			case CLEX_intlit:
 			{
 				sc.localv.push_back(B_Variable {
-					.file = file,
+					.in_file = file,
 					.location = l.location,
 					.ir = debug ? nob_temp_sprintf("  ; Stub generated at %s:%d\n", __FILE__, __LINE__) : "" });
 				gen_alloca(ir, working_id);
 
 				sc.localv.push_back(B_Variable {
 					.value_type = Int,
-					.file = file,
+					.in_file = file,
 					.location = l.location,
 					.ir = debug ? nob_temp_sprintf("  ; Stub generated at %s:%d\n", __FILE__, __LINE__) : "" });
 				gen_store_rval_to_lval(ir, working_id, std::to_string(la.GetLexer().int_number));
@@ -557,12 +560,12 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 					parse_function_call(file, sc, lb, ir, la.string, true);
 
 					sc.localv.push_back(B_Variable {
-						.file = file,
+						.in_file = file,
 						.location = l.location });
 
 					sc.localv.push_back(B_Variable {
 						.value_type = Int,
-						.file = file,
+						.in_file = file,
 						.location = l.location });
 
 					if (final_type == Invalid_Value_Type)
@@ -601,7 +604,7 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 							nob_log(NOB_WARNING, "%s:%d:%d: Variable `%s` is being shadowed.",
 									l.filename, l.location.line_number, l.location.line_offset, la.string);
 							Compilation_error(VariableIsShadowed);
-							// Fall through
+							[[fallthrough]];
 						case 0b01:
 							if (final_type == Invalid_Value_Type)
 								final_type = Int;
@@ -614,7 +617,7 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 								// delete sc.localv.at(var1).name;
 							}
 
-							sc.localv.push_back(B_Variable { .file = file, .location = l.location });
+							sc.localv.push_back(B_Variable { .in_file = file, .location = l.location });
 							break;
 
 						default: NOB_UNREACHABLE("You did a fucky wucky");
@@ -628,22 +631,22 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 			default: NOB_UNREACHABLE("Unexpected token");
 		}
 
-		working_id = sc.localv.size();
+		working_id = (Variable_Id)sc.localv.size();
 
 		if (ops.size() > 0) {
 			sc.localv.push_back(B_Variable {
-				.file = file,
+				.in_file = file,
 				.location = l.location,
 				.ir = debug ? nob_temp_sprintf("  ; Stub generated at %s:%d\n", __FILE__, __LINE__) : "" });
 
-			Variable_Id opa = ab.rbegin()[1];
-			Variable_Id opb = ab.rbegin()[0];
+			const Variable_Id opa = ab.rbegin()[1];
+			const Variable_Id opb = ab.rbegin()[0];
 
 			gen_binary_op(ir, working_id, opa, opb, sc.localv, ops.back());
 
 			if (step_lexers) {
 				gen_store_lval_to_lval(ir, working_id + 1, working_id);
-				working_id = sc.localv.size();
+				working_id = (Variable_Id)sc.localv.size();
 			} else {
 				gen_store_lval_to_lval(ir, outcome_id, working_id);
 			}
@@ -671,11 +674,11 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 	gen_load_lval_to_lval(ir, sc.localv.size(), outcome_id);
 
 	{
-		B_Variable& old = sc.localv.at(outcome_id);
+		const B_Variable& old = sc.localv.at(outcome_id);
 		sc.localv.push_back(B_Variable {
 			// Do not copy the LLVM-IR AAAAAAAAAAAAAAAAAAAAAAH
 			.name = old.name, // strdup maybe. For now keep the name around for debugging
-			.file = old.file,
+			.in_file = old.in_file,
 			.location = old.location,
 			.global = old.global, });
 	}
@@ -707,6 +710,23 @@ uint8_t parse_assigning_expression(Lexer& l, const char* variable_name, B_Scope&
 
 #pragma endregion
 #pragma region Keywords
+
+Keyword check_keyword_identifier(std::string& k)
+{
+	static std::map<std::string, Keyword> String2Keyword = {
+		{ "extrn", Extrn },
+		{ "auto", Auto },
+		{ "return", Return },
+		{ "switch", Switch },
+		{ "case", Case },
+		{ "if", If },
+		{ "else", Else },
+		{ "while", While },
+		{ "goto", Goto },
+	};
+
+	return String2Keyword.at(k);
+}
 
 Keyword check_keyword_identifier(const char* k)
 {
@@ -740,7 +760,7 @@ uint8_t parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const bool is_
 
 	if (l.token != CLEX_id) {
 		nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected name of variable after this auto keyword.",
-				File, l.location.line_number, l.location.line_offset);
+				CurrentFile, l.location.line_number, l.location.line_offset);
 		Compilation_error(InvalidSyntax);
 		return InvalidSyntax;
 	}
@@ -766,7 +786,7 @@ uint8_t parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const bool is_
 
 		default:
 			nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: unexpected token in auto variable declaration for `%s`.",
-					File, l.location.line_number, l.location.line_offset, l.string);
+					CurrentFile, l.location.line_number, l.location.line_offset, l.string);
 			Compilation_error(InvalidSyntax);
 			return InvalidSyntax;
 	}
@@ -863,8 +883,8 @@ Variable_Id parse_secondary_expression(Lexer& l, LLVM_IR& ir, B_Scope& sc, const
 				gen_alloca(ir, id);
 				gen_store_rval_to_lval(ir, id, std::to_string(la.GetLexer().int_number));
 				gen_load_lval_to_lval(ir, id + 1, id);
-				sc.localv.push_back(B_Variable { .file = file, .location = l.location });
-				sc.localv.push_back(B_Variable { .value_type = Int, .file = file, .location = l.location });
+				sc.localv.push_back(B_Variable { .in_file = file, .location = l.location });
+				sc.localv.push_back(B_Variable { .value_type = Int, .in_file = file, .location = l.location });
 				ab.push_back(id + 1);
 				break;
 
@@ -873,8 +893,8 @@ Variable_Id parse_secondary_expression(Lexer& l, LLVM_IR& ir, B_Scope& sc, const
 					gen_alloca(ir, id);
 					ab.push_back(id + 1);
 					parse_function_call(file, sc, lb, ir, la.string, true);
-					sc.localv.push_back(B_Variable { .file = file, .location = l.location });
-					sc.localv.push_back(B_Variable { .value_type = Int, .file = file, .location = l.location });
+					sc.localv.push_back(B_Variable { .in_file = file, .location = l.location });
+					sc.localv.push_back(B_Variable { .value_type = Int, .in_file = file, .location = l.location });
 					la.GetLexer() = lb.GetLexer();
 					lb.Step();
 				} else {
@@ -885,7 +905,7 @@ Variable_Id parse_secondary_expression(Lexer& l, LLVM_IR& ir, B_Scope& sc, const
 					switch (((var1 == INVALID_VARIABLE) << 1) + ((var2 == INVALID_VARIABLE) << 0)) {
 						case 0b11:
 							nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: variable `%s` is not declared.",
-									File, l.location.line_number, l.location.line_offset, la.string);
+									CurrentFile, l.location.line_number, l.location.line_offset, la.string);
 							Compilation_error(InvalidSyntax);
 							break;
 
@@ -903,9 +923,9 @@ Variable_Id parse_secondary_expression(Lexer& l, LLVM_IR& ir, B_Scope& sc, const
 
 						case 0b00:
 							nob_log(NOB_WARNING, "%s:%d:%d: Variable `%s` is being shadowed.",
-									File, l.location.line_number, l.location.line_offset, la.string);
+									CurrentFile, l.location.line_number, l.location.line_offset, la.string);
 							Compilation_error(VariableIsShadowed);
-							// Fall through
+							[[fallthrough]];
 						case 0b01:
 							ab.push_back(sc.localv.size() - 1);
 							break;
@@ -929,8 +949,8 @@ Variable_Id parse_secondary_expression(Lexer& l, LLVM_IR& ir, B_Scope& sc, const
 			gen_alloca(ir, dest);
 			++dest;
 
-			sc.localv.push_back(B_Variable { .file = file, .location = l.location });
-			sc.localv.push_back(B_Variable { .value_type = Int, .file = file, .location = l.location });
+			sc.localv.push_back(B_Variable { .in_file = file, .location = l.location });
+			sc.localv.push_back(B_Variable { .value_type = Int, .in_file = file, .location = l.location });
 
 			Variable_Id opa = ab.rbegin()[1];
 			Variable_Id opb = ab.rbegin()[0];
@@ -1001,10 +1021,10 @@ uint8_t parse_function_call(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir, 
 
 	switch (((fid == INVALID_FUNCTION) << 1) + ((efid == INVALID_FUNCTION) << 0)) {
 		case 0b00:
-			nob_log(NOB_ERROR, "%s:%d:%d: Ambiguous function call: `%s` used as extrn function and B function.",
-					File, l.location.line_number, l.location.line_offset, callee);
+			nob_log(NOB_ERROR, "%s:%d:%d: Ambiguous function call: `%s` is an `extrn` function and B function.",
+					CurrentFile, l.location.line_number, l.location.line_offset, callee);
 			Compilation_error(FunctionRedefinition);
-			// Fall through
+			[[fallthrough]];
 		case 0b10:
 			if (force_retvalgen) {
 				gen_funccall(ir, sc.localv.size(), callee);
@@ -1107,7 +1127,7 @@ uint8_t parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 
 		case 0b10: // means this name was defined as an extrn function
 			nob_log(NOB_ERROR, "%s:%d:%d: Ambiguous function: `%s` is already defined as an extern function.",
-					File, l.location.line_number, l.location.line_offset, name);
+					CurrentFile, l.location.line_number, l.location.line_offset, name);
 			nob_log(NOB_ERROR, "%s:%d:%d: <--- `%s` is first defined here.",
 					input_files[sc.extern_functions[efid].in_file].filepath,
 					sc.extern_functions[efid].location.line_number,
@@ -1146,7 +1166,7 @@ uint8_t parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 	switch (l.GetNextToken()) { // TODO: Reconsider stepping ahead here
 		case '}':
 			l.Step();
-			// Fall through
+			[[fallthrough]];
 		case ';':
 			// nob_log(NOB_WARNING, "%s:%d:%d: Warning: empty function: `%s`",
 			// 		File, sc.lex_location.line_number, sc.lex_location.line_offset, name);
@@ -1189,7 +1209,7 @@ void backpatch_all_function_calls(const int file, const B_Scope& scope)
 		if ((i.definitions == 0) && (i.calls > 0)) {
 			nob_log(NOB_INFO, "%s:%d:%d: The function `%s` is called %d %s but never defined.",
 					// Yes, the function location contains the function call location, until it gets defined.
-					File, i.location.line_number, i.location.line_offset,
+					CurrentFile, i.location.line_number, i.location.line_offset,
 					i.name, i.calls, i.calls == 1 ? "time" : "times");
 			Compilation_error(FunctionNeverDefined);
 		}
@@ -1323,75 +1343,108 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 
 	if (compilation.stop) {
 		nob_log(NOB_INFO, "Stopping compilation: %d errors, %d warnings", compilation.errors, compilation.warnings);
+#if defined(DEBUG)
 		if ((compiler_file != nullptr) && (file_line > -1))
 			nob_log(NOB_INFO, "%s:%d:%d: <--- compilation stopped here in compiler.", compiler_file, file_line, 1);
+#endif
 		exit(e);
 	} else return;
 }
 
 bool dispatch_clang(std::string& output_file)
 {
-	bool needs_linking_step = input_files.size() > 1;
-	bool use_custom_output = !output_file.empty();
+	bool delete_ir = false;
+	switch (compilation.GetIROutput()) {
+		case DontCompile: return true;
+		case KeepIrAfterCompile: break;
+		case DeleteIrAfterCompile:
+#if defined(ENABLE_FILE_DELETIONS) && !defined(DEBUG)
+			delete_ir = true;
+#endif
+			break;
+		default: NOB_UNREACHABLE("Unhandled case for keeping or deleting IR");
+	}
 
-	std::string output_file_type;
-	std::string clang_args;
+	bool use_custom_output = false;
+	if (!output_file.empty()) {
+		use_custom_output = true;
 
+		const char* extension = strrchr(output_file.data(), '.');
 
+		if (strcmp(extension, "o") == 0)
+			compilation.wants_executable = false;
+	}
 
+	static Nob_Cmd clang_cmd;
+	static Nob_Procs procs;
 
+	static bool first = true;
+	if (first) {
+		memset(&clang_cmd, 0, sizeof(clang_cmd));
+		memset(&procs, 0, sizeof(procs));
+		first = false;
+	} else {
+		clang_cmd.count = 0;
+		procs.count = 0;
+	}
 
+	if (compilation.wants_executable && (input_files.size() == 1)) {
+		std::basic_string ll_file = swap_extension(input_files[0].filepath, "ll");
+		nob_cmd_append(&clang_cmd, "clang");
+		nob_cmd_append(&clang_cmd, "-o", use_custom_output ? output_file.data() : chop_extension(input_files[0].filepath));
+		nob_cmd_append(&clang_cmd, ll_file.data());
 
+		if (!nob_cmd_run(&clang_cmd))
+			return false;
 
-	// TODO: Compiler segfaults when two valid files are supplied. Side note: both had main functions
-	// TODO: Compiler calls clang with the first of two files when one is empty and the other has an empty function.
+		if (delete_ir)
+			nob_delete_file(ll_file.data());
 
-	// for (uint8_t i = 0; i < input_files.size(); ++i) {
-	// 	std::basic_string ll_file = swap_extension(input_files[i].filepath, "ll");
+		return true;
+	}
 
-	// 	if (have_custom_output_name) {
-	// 		output_file_type = strrchr(output_file.c_str(), '.');
-	// 		nob_log(NOB_INFO, "Output file name: %s", output_file.c_str());
-	// 	}
+	// Compile our generated LLVM IR to an object
+	for (int i = 0; i < (int)input_files.size(); ++i) {
+		std::basic_string ll_file = swap_extension(input_files[i].filepath, "ll");
+		std::basic_string obj_file = swap_extension(input_files[i].filepath, "o");
 
+		nob_cmd_append(&clang_cmd, "clang", "-c", "-o", obj_file.data(), ll_file.data());
 
-	// 	if (output_file_type.empty()) {
+		if (!nob_cmd_run(&clang_cmd, .async = &procs))
+			return false;
 
-	// 		return run_clang(have_custom_output_name ? chop_extension(output_file.c_str()) : chop_extension(input_files[i].filepath), ll_file.data());
+		clang_cmd.count = 0;
+	}
 
-	// 	} else if ((output_file_type.compare(".ll")) ||
-	// 			   (compilation.irout == DontCompile)) {
+	if (!nob_procs_wait(procs))
+		return false;
 
-	// 		nob_log(NOB_INFO, "Outputting LLVM-IR only");
-	// 		return true;
+	procs.count = 0;
 
-	// 	} else if ((output_file_type.compare(".obj")) ||
-	// 			   (output_file_type.compare(".o"))) { // .o file
+	// Create executable
+	if (compilation.wants_executable) {
+		nob_cmd_append(&clang_cmd, "clang");
+		nob_cmd_append(&clang_cmd, "-o", use_custom_output ? output_file.data() : chop_extension(input_files[0].filepath));
 
-	// 		return run_clang(swap_extension(input_files[i].filepath, ".o"), ll_file.data());
+		for (int i = 0; i < (int)input_files.size(); ++i) {
+			if (delete_ir)
+				nob_delete_file(swap_extension(input_files[i].filepath, "ll"));
 
-	// 	} else if (output_file_type.compare(".exe")) { // .exe file
+			nob_cmd_append(&clang_cmd, swap_extension(input_files[i].filepath, "o"));
+		}
 
-	// 		return run_clang(have_custom_output_name ? output_file.data() : swap_extension(input_files[i].filepath, "exe"), ll_file.data());
+		if (!nob_cmd_run(&clang_cmd, .async = &procs))
+			return false;
 
-	// 	} else NOB_UNREACHABLE("Couldn't determine what type of file to output");
-	// }
+		clang_cmd.count = 0;
 
-	// if (needs_linking_step) {
-	// 	std::string files_to_link;
+		if (!nob_procs_wait(procs))
+			return false;
 
-	// 	for (uint8_t i = 0; i < input_files.size(); ++i) {
-	// 		if (i > 0)
-	// 			files_to_link += " ";
+		procs.count = 0;
+	}
 
-	// 		files_to_link.append(swap_extension(input_files[i].filepath, "o"));
-	// 	}
-
-	// 	nob_log(NOB_INFO, "Linking into %s", output_file.c_str());
-	// 	return run_clang(output_file.data(), files_to_link.data());
-	// }
-
-	return false;
+	return true;
 }
 
 // void update_state(const bool is_main, const int file, uint8_t fut)

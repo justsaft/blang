@@ -9,6 +9,11 @@ extern Compilation compilation;
 // gen_ir.cpp
 
 
+// Setup
+// -----
+void setup_ir_gen(const Compilation& c);
+
+
 // file header
 // -----------
 void gen_file_ir_info(LLVM_IR& ir, const char* target, const char* file_name);

@@ -58,6 +58,9 @@ public:
     Lexer()
     {
         m_ClexBuffer.reserve(CLEX_BUFFER_DEFAULT_SIZE);
+        memset(&m_Location, 0, sizeof(m_Location));
+        memset(&m_Lexer, 0, sizeof(m_Lexer));
+        m_FileName = nullptr;
     }
 
     ~Lexer() = default;
@@ -67,19 +70,11 @@ public: // copy constructor
     Lexer(const Lexer& other) :
         m_FileName(other.m_FileName),
         m_Lexer(other.m_Lexer),
+        m_Location(other.m_Location),
         m_ClexBuffer(other.m_ClexBuffer),
         m_ClexInputStream(other.m_ClexInputStream)
     { }
 
-    // Lexer operator=(const Lexer&)
-    // {
-    //     return *this;
-    // }
-
-    // Lexer operator=(const Lexer&)
-    // {
-    //     return *this;
-    // }
 
 public:
     stb_lexer& GetLexer(void)
@@ -162,9 +157,11 @@ public:
         // return m_Lexer.string;
     // }
 
-    const char* GetTokenForText(void) const
+    std::string GetTokenForText(void) const
     {
-        return std::to_string(m_Lexer.token < 256 ? (char)m_Lexer.token : m_Lexer.token).c_str();
+        return (m_Lexer.token < 256)
+            ? std::string(1, static_cast<char>(m_Lexer.token))
+            : std::to_string(m_Lexer.token);
     }
 
     int GetToken(void) const
@@ -220,9 +217,9 @@ public:
         return GetNextToken() == token;
     }
 
-    bool Expect(const int token)
+    bool Expect(const int token) const
     {
-        return (int)m_Lexer.token == token;
+        return ((int)m_Lexer.token) == token;
     }
 
     void Step(int steps = 1)
@@ -253,7 +250,7 @@ public:
             return ErrorReadInput;
         }
 
-        stb_c_lexer_init(&m_Lexer, m_ClexInputStream.items, m_ClexInputStream.items + m_ClexInputStream.count, m_ClexBuffer.data(), m_ClexBuffer.capacity() - 1);
+        stb_c_lexer_init(&m_Lexer, m_ClexInputStream.items, m_ClexInputStream.items + m_ClexInputStream.count, m_ClexBuffer.data(), (int)m_ClexBuffer.capacity());
 
         if (!stb_c_lexer_get_token(&m_Lexer)) {
             nob_log(NOB_ERROR, "File %s is empty.", m_FileName);

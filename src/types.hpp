@@ -2,7 +2,12 @@
 #ifndef _TYPES_HPP
 #define _TYPES_HPP
 
+#ifdef _WIN32
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
+#endif
 
+#include <stddef.h>
 #include <stdint.h>
 #include <array>
 #include <vector>
@@ -19,6 +24,16 @@ enum IR_Output : uint8_t {
 	DeleteIrAfterCompile,
 	KeepIrAfterCompile,
 	DontCompile,
+};
+
+enum LangMode : bool {
+	Historical,
+	Modernized, // == B-Ext
+};
+
+enum WordSize : bool {
+	SixteenBit,
+	SixtyfourBit,
 };
 
 enum Returns : uint8_t {
@@ -146,72 +161,118 @@ constexpr int CLEX_BUFFER_DEFAULT_SIZE = 0x1000;
 constexpr int MAX_ERRORS_BEFORE_STOP = 15;
 constexpr int WHERES_YOUR_GOD_NOW = INT32_MAX;
 
-typedef struct {
+struct B_File {
 	const char* filepath;
 	Returns state = Success;
-	// LLVM_IR ir;
-} B_File;
+};
 
 typedef std::vector<B_File> B_Files;
 
-typedef struct {
-	int in_file = -1,
-		line = -1,
-		line_offset = -1;
-} B_ItemLocation;
+//typedef struct B_ItemLocation {
+//	int in_file = -1,
+//		line = -1,
+//		line_offset = -1;
+//};
 
-typedef struct B_Variable {
+//typedef struct Scope {
+//	int depth = 0;
+//};
+
+struct B_Variable {
 	const char* name = nullptr;
 	Value_Type value_type = Dead;
-	int file;
-	stb_lex_location location;
-	LLVM_IR ir = ""; // TODO: remove so that it won't cause SSA to break
+	int in_file = -1;
+	stb_lex_location location = { -1, -1 };
+	LLVM_IR ir = ""; // TODO: remove so I won't break SSA again
 	bool global = false;
-} B_Variable;
+};
 
-typedef struct B_Function {
+struct B_Function {
 	const char* name;
 	int in_file = -1,
 		definitions = 0,
 		calls = 0,
 		attr_group = 0;
 	stb_lex_location location = { -1, -1 };
-} B_Function;
+};
 
-typedef struct {
-	int definitions = 0,
-		calls = 0,
-		attr_group = 0;
-	std::vector<B_ItemLocation> locations;
-} B_FunctionInfo;
+//struct B_FunctionInfo {
+//	int definitions = 0,
+//		calls = 0,
+//		attr_group = 0;
+//	std::vector<B_ItemLocation> locations;
+//};
 
-typedef struct {
-	bool stop = false;
-	bool has_entry = false;
-	bool wants_executable = true;
+struct Compilation {
+public:
+	bool stop = false,
+		has_entry = false,
+		wants_executable = true;
 
-	int current_file = 0, errors = 0, warnings = 0;
+	int current_file = 0,
+		errors = 0,
+		warnings = 0;
 
-	enum /* struct */ Modes : bool {
-		Historical,
-		Modernized, // == B-Ext
-	};
+	Returns state = Success;
 
-	enum /* struct */ WordSize : bool {
-		SixteenBit,
-		SixtyfourBit,
-	};
+public:
+	LangMode GetLangMode(void) const
+	{
+		return lang_mode;
+	}
 
-	Modes langfeatures = Historical;
+	WordSize GetWordSize(void) const
+	{
+		return word_size;
+	}
+
+	IR_Output GetIROutput(void) const
+	{
+		return irout;
+	}
+
+	bool IsLangMode(LangMode lm) const
+	{
+		return lang_mode == lm;
+	}
+
+	bool IsWordSize(WordSize ws) const
+	{
+		return word_size == ws;
+	}
+
+	bool IsIROutput(IR_Output iro) const
+	{
+		return irout == iro;
+	}
+
+protected:
+	friend void parse_cli_arguments(int, char**, std::string&, std::string&, B_Files&, Compilation&);
+
+	void SetLangMode(LangMode lm)
+	{
+		lang_mode = lm;
+	}
+
+	void SetWordSize(WordSize ws)
+	{
+		word_size = ws;
+	}
+
+	void SetIROutput(IR_Output iro)
+	{
+		irout = iro;
+	}
+
+private:
+	LangMode lang_mode = Historical;
 	WordSize word_size = SixteenBit;
 	IR_Output irout = DeleteIrAfterCompile;
-	Returns state;
-} Compilation;
+};
 
 typedef std::vector<B_Variable> B_Variable_Scope;
 typedef std::vector<B_Function> B_Function_Scope;
-
-typedef std::map<std::string, std::vector<B_FunctionInfo>> B_FunctionScope_New;
+//typedef std::map<std::string, std::vector<B_FunctionInfo>> B_FunctionScope_New;
 
 
 // POS Types
@@ -251,11 +312,5 @@ enum Reserved_Variable_Ids : Variable_Id {
 constexpr Function_Id INVALID_FUNCTION = -1;
 constexpr Function_Id FIRST_FUNCTION_ID = 0;
 
-inline std::array<const char*, 4> LLVM_Known_Target_Triples = {
-	"x86_64-pc-windows-msvc",
-	"x86_64-pc-windows-gnu",
-	"x86_64-unknown-linux-gnu",
-	"x86_64-pc-linux-gnu"
-};
 
 #endif

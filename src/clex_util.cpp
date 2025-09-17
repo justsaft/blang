@@ -15,7 +15,7 @@ void get_lexer_location(const stb_lexer& l, stb_lex_location& lo)
 
 void unexpected_eof(const char* filename, const stb_lexer& l, stb_lex_location& lo)
 {
-    int len = strlen(l.input_stream);
+    size_t len = strlen(l.input_stream);
 
     if (len == 0) {
         nob_log(NOB_ERROR, "   %d:%d: Unexpected EOF: Input stream was empty.",
@@ -23,7 +23,7 @@ void unexpected_eof(const char* filename, const stb_lexer& l, stb_lex_location& 
     } else {
         nob_log(NOB_ERROR, "%s:%d:%d: Unexpected EOF:\n %s<EOF>",
                 filename, lo.line_number, lo.line_offset,
-                len > 12 ? &l.where_lastchar[-12] : &l.where_lastchar[-len]);
+                len > 12 ? &l.where_lastchar[-(signed)12] : &l.where_lastchar[-(signed)len]);
     }
 }
 
@@ -32,7 +32,7 @@ void unexpected_eof(const char* filename, const stb_lexer& l)
     stb_lex_location lo;
     get_lexer_location(l, lo);
 
-    int len = strlen(l.input_stream);
+    size_t len = strlen(l.input_stream);
 
     if (len == 0) {
         nob_log(NOB_ERROR, "   %d:%d: Unexpected EOF: Input stream was empty.",
@@ -40,7 +40,7 @@ void unexpected_eof(const char* filename, const stb_lexer& l)
     } else {
         nob_log(NOB_ERROR, "%s:%d:%d: Unexpected EOF:\n %s<EOF>",
                 filename, lo.line_number, lo.line_offset,
-                len > 12 ? &l.where_lastchar[-12] : &l.where_lastchar[-len]);
+                len > 12 ? &l.where_lastchar[-(signed)12] : &l.where_lastchar[-(signed)len]);
     }
 
     throw;
@@ -65,10 +65,10 @@ long peak_next_token(stb_lexer& l)
     return fork.token;
 }
 
-const char* token_or_char(long token)
-{
-    return std::to_string(token < 256 ? (char)token : token).c_str();
-}
+//const char* token_or_char(long token)
+//{
+//    return std::to_string(token < 256 ? (char)token : token).c_str();
+//}
 
 bool get_and_expect_token(stb_lexer& l, const long token)
 {
