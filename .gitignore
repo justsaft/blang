@@ -9,6 +9,7 @@
 !Makefile_
 !CMakeLists.txt
 
+out/
 mat/
 build/
 CMakeFiles/
@@ -16,5 +17,7 @@ blang
 nob
 *.cmake
 CMakeCache.txt
+CMakeSettings.json
 *.ll
 .vscode/settings.json
+.vs

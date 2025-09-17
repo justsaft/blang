@@ -12,6 +12,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 # Source directories
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 set(BLD_DIR "${CMAKE_BINARY_DIR}/build")
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
+
+set_source_files_properties(${SRC_DIR}/clex.c PROPERTIES COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-unused-function>)
 
 # C++ source files
 set(CPP_SOURCES
@@ -28,47 +32,24 @@ set(C_SOURCES
     ${SRC_DIR}/output.c
 )
 
+# Headers
 file(GLOB HEADER_FILES
     "${SRC_DIR}/*.h"
     "${SRC_DIR}/*.hpp"
+    "3rd-party/*.h"
+    "3rd-party/*.hpp"
 )
 
-# Add executable for blang
+# executable for blang
 add_executable(blang
     ${CPP_SOURCES}
     ${C_SOURCES}
-    ${HEADER_FILES}
+    #${HEADER_FILES}
 )
 
-# Set compile options for C and C++
-target_compile_options(blang PRIVATE -Wall -Wextra -ggdb)
-
-# For clex.c, suppress -Wunused-function
-set_source_files_properties(${SRC_DIR}/clex.c PROPERTIES COMPILE_FLAGS "-Wno-unused-function")
-
-# Custom target for nob (bootstrap)
-add_executable(nob ${CMAKE_SOURCE_DIR}/build.c)
-set_target_properties(nob PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${BLD_DIR}
+# compile options
+target_compile_options(blang PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -ggdb>
+    $<$<CXX_COMPILER_ID:Clang>:-g>
+    $<$<CXX_COMPILER_ID:MSVC>:/W3 /Zi>
 )
-
-# Add a custom target to mimic 'nob_build'
-add_custom_target(nob_build
-    COMMAND ${BLD_DIR}/nob
-    DEPENDS nob
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Running nob bootstrap build"
-)
-
-# Add a FORCE target (dummy, for compatibility)
-add_custom_target(FORCE
-    COMMENT "Dummy FORCE target for compatibility"
-)
-
-# Ensure build directory exists (CMake handles this by default)
-# No need for explicit mkdir
-
-# Notes:
-# - To build blang: `cmake --build . --target blang`
-# - To build nob:   `cmake --build . --target nob`
-# - To run nob_build: `cmake --build . --target nob_build`

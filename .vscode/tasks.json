@@ -1,49 +1,67 @@
 {
 	"version": "2.0.0",
 	"tasks": [
-		/* {
-			"type": "cmake",
-			"label": "CMake: build",
-			"command": "build",
-			"targets": [
-				"blang"
-			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
-			"problemMatcher": [],
-			"detail": "CMake template build task"
-		}, */
 		{
-			"label": "nob build",
+			"label": "BuildNob",
 			"type": "shell",
 			"windows": {
-				"command": "${workspaceFolder}/nob.exe",
-				"dependsOn": [
-					{
-						"label": "Check for nob.exe",
-						"type": "shell",
-						"command": "if not exist \"${workspaceFolder}\\nob.exe\" (echo \"nob.exe not found, please build it first\" && exit 1)"
-					}
+				"command": "cmd",
+				"args": [
+					"/d",
+					"/c",
+					"if not exist \"${workspaceFolder}\\nob.exe\" (echo \"'nob.exe' is expected but missing: Please add your favourite compiler to your PATH and build the build recipe with it.\" & exit /b 1)"
+				]
+			},
+			"linux": {
+				"command": "bash",
+				"args": [
+					"-lc",
+					"[ -e \"${workspaceFolder}/nob\" ] || (cc build.c -o nob && exit $?)"
 				],
+			},
+			"detail": "Build Nob (Task)"
+		},
+		{
+			"label": "BuildWithNob",
+			"type": "shell",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"BuildNob"
+			],
+			"windows": {
+				"command": "${workspaceFolder}/nob.exe",
+				"args": [ ]
 			},
 			"linux": {
 				"command": "${workspaceFolder}/nob",
-				"dependsOn": [
-					{
-						"label": "Check for nob",
-						"type": "shell",
-						"command": "[[ -f \"${workspaceFolder}/nob\" ]] || (cc build.c -o nob)"
-					}
-				],
+				"args": []
 			},
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			},
-			"problemMatcher": [],
-			"detail": "Build with Nob task"
+			"detail": "Build the project with Nob (Task)"
+		},
+		{
+			"label": "BuildWithNobDebug",
+			"type": "shell",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"BuildNob"
+			],
+			"windows": {
+				"command": "${workspaceFolder}/nob.exe",
+				"args": [ "--debug" ]
+			},
+			"linux": {
+				"command": "${workspaceFolder}/nob",
+				"args": [ "--debug" ]
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "Build the project with Nob (Debug flag) (Task)"
 		}
 	]
 }

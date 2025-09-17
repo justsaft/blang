@@ -6,10 +6,10 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/blang",
-            "args": [ "../b_src/031-addtest2.b" ],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "preLaunchTask": "nob build",
+            "args": [ "${workspaceRoot}/b_src/030-addtest.b" ],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "BuildWithNobDebug",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -25,31 +25,6 @@
                     "ignoreFailures": true
                 }
             ]
-        }/* ,
-        {
-            "name": "Debug Cmake built project with gdb",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceRoot}/build/build/blang",
-            "args": [ "../b_src/return_lval.b" ],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "preLaunchTask": "CMake: build",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
-        } */
+        }
     ]
 }
