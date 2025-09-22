@@ -17,13 +17,6 @@
 void set_minimal_nob_log_level(Nob_Log_Level level);
 
 
-// TODO: (no) linking with libc
-//       -nostdlib: Disables linking with both libc and the standard startup files.
-//       -nodefaultlibs : Disables linking with libc but still includes the startup files.
-//       -llibstd++
-//       ld -s hello.o crt2.o -o hello.exe libstdc++.a libgcc.a libmingw32.a libmingwex.a libmsvcrt.a libkernel32.a
-
-
 bool write_ll_file(const char* original_file, const char* ir, size_t ir_size)
 {
 	bool result = true;
@@ -121,21 +114,3 @@ char* swap_extension(const char* filename, const char* new_extension)
 	free(base);
 	return result;
 }
-
-bool run_clang(const char* output_file, const char* args)
-{
-	bool result = true;
-
-	static Cmd c = { 0 };
-
-	cmd_append(&c, CLANGC, output_file, args);
-
-	if (!cmd_run_sync_and_reset(&c))
-		return_defer(false);
-
-defer:
-	c.count = 0;
-	return result;
-}
-
-// TODO: maybe compile the .ll file .o using llc instead

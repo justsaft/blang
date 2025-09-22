@@ -20,6 +20,12 @@ extern "C" {
 #include "../3rd-party/stb_c_lexer.h"
 }
 
+enum Backend : uint8_t {
+	Backend_LLC,
+	Backend_CLANG,
+	TotalAmountOfBackends,
+};
+
 enum IR_Output : uint8_t {
 	DeleteIrAfterCompile,
 	KeepIrAfterCompile,
@@ -39,7 +45,7 @@ enum WordSize : bool {
 enum Returns : uint8_t {
 	Success,
 	CompilationHadWarnings,
-	ClangNonZeroExitcode,
+	BackendNonZeroExitcode,
 	EverythingCouldBeWrong,
 	NoFilesGiven,
 	NoFunctions,

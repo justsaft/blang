@@ -5,6 +5,7 @@
 #include "gen_ir.hpp"
 #include "common.hpp"
 #include "clex_wrapper.hpp"
+#include "backend.hpp"
 
 extern "C"
 {
@@ -17,7 +18,6 @@ extern "C"
 
 // Driver
 bool dispatch_clang(std::string& output_file_name);
-std::string get_target_triple_clang(void);
 
 
 // Parsing
@@ -102,12 +102,12 @@ int main(int argc, char** argv)
 		Compilation_error(NoFilesGiven);
 	}
 
-	if (!is_clang_installed()) {
+	if (!is_backend_installed()) {
 		nob_log(NOB_ERROR, "Cannot continue. Please install `clang`. (it is a hard dependency at this time)");
 		return 1;
 	}
 
-	std::string current_platform = get_target_triple_clang();
+	std::string current_platform = get_target_triple();
 
 	if (target.empty()) {
 		target.append(current_platform);

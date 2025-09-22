@@ -49,7 +49,7 @@
 #define BLD "build/"
 
 
-#define a 7
+#define a 8
 Nob_Procs procs = { 0 };
 Nob_Cmd cmds[a] = { 0 };
 Nob_Cmd linkcmd = { 0 };
@@ -82,6 +82,7 @@ int main(int argc, char** argv)
 	nob_cmd_append(&cmds[4], CC, BLD"output.o", SRC"output.c");
 	nob_cmd_append(&cmds[5], CC, BLD"nob.o", SRC"nob.c");
 	nob_cmd_append(&cmds[6], CC, BLD"clex.o", LESS_WARNS, SRC"clex.c");
+	nob_cmd_append(&cmds[7], CXXC, BLD"backend.o", SRC"backend.cpp");
 
 	for (int i = 0; i < a; ++i) {
 		if (debug)
@@ -91,7 +92,7 @@ int main(int argc, char** argv)
 			compile_ok = false;
 	}
 
-	nob_cmd_append(&linkcmd, LINK, BLD"main.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o");
+	nob_cmd_append(&linkcmd, LINK, BLD"main.o", BLD"backend.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o");
 
 	for (int i = 0; i < a; ++i) {
 		if (!nob_procs_wait_and_reset(&procs)) {

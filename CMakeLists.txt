@@ -23,6 +23,7 @@ set(CPP_SOURCES
     ${SRC_DIR}/gen_ir.cpp
     ${SRC_DIR}/cli.cpp
     ${SRC_DIR}/clex_util.cpp
+    ${SRC_DIR}/backend.cpp
 )
 
 # C source files
