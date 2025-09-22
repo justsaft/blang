@@ -8,11 +8,11 @@
 
 #if defined(__GNUC__)
 #define LESS_WARNS "-Wno-unused-function"
-#define WARNS "-Wno-missing-field-initializers"
-#define DEBUG debug ? "-ggdb" : "", debug ? "-DDEBUG" : ""
-#define FLAGS "-Wall", "-Wextra", "-c"
-#define CC "gcc", DEBUG, FLAGS, WARNS, "-std=c11", "-o"
-#define CXXC "g++", DEBUG, FLAGS, WARNS, "-std=c++23", "-o"
+#define WARNS "-Wall", "-Wextra", "-Wno-missing-field-initializers"
+#define FLAGS "-c"
+#define DEBUG "-ggdb", "-DDEBUG"
+#define CC "gcc", FLAGS, WARNS, "-std=c11", "-o"
+#define CXXC "g++", FLAGS, WARNS, "-std=c++23", "-o"
 
 #ifdef _WIN32
 #define LINK "g++", "-o", "blang.exe"
@@ -22,11 +22,11 @@
 
 #elif defined(__clang__)
 #define LESS_WARNS "-Wno-unused-function"
-#define WARNS "-Wno-deprecated-declarations", "-Wno-non-c-typedef-for-linkage"
-#define DEBUG debug ? "-g" : ""
+#define WARNS "-Wno-deprecated-declarations", "-Wno-non-c-typedef-for-linkage", "-Wno-missing-field-initializers"
 #define FLAGS "-c"
-#define CC "clang", DEBUG, FLAGS, WARNS, "-std=c11", "-o"
-#define CXXC "clang++", DEBUG, FLAGS, WARNS, "-std=c++23", "-o"
+#define DEBUG "-g", "-DDEBUG"
+#define CC "clang", FLAGS, WARNS, "-std=c11", "-o"
+#define CXXC "clang++", FLAGS, WARNS, "-std=c++23", "-o"
 
 #ifdef _WIN32
 #define LINK "clang++", "-o", "blang.exe"
@@ -36,9 +36,9 @@
 
 #elif defined(_MSC_VER)
 #define WARNS "/W3"
-#define DEBUG debug ? "/Zi" : ""
-#define CC "cl.exe", "/EHsc", "/permissive-", WARNS, DEBUG, "/c", /*"/FS",*/ "/std:c11", "/Fo:"
-#define CXXC "cl.exe", "/EHsc", "/permissive-", WARNS, DEBUG, "/c", /*"/FS",*/ "/std:c++20", "/Fo:"
+#define DEBUG "/Zi", "/DDEBUG"
+#define CC "cl.exe", "/EHsc", "/permissive-", WARNS, "/c", /*"/FS",*/ "/std:c11", "/Fo:"
+#define CXXC "cl.exe", "/EHsc", "/permissive-", WARNS, "/c", /*"/FS",*/ "/std:c++20", "/Fo:"
 #define LINK "link.exe", "/NOLOGO", "/OUT:blang.exe"
 
 #endif
@@ -84,9 +84,11 @@ int main(int argc, char** argv)
 	nob_cmd_append(&cmds[6], CC, BLD"clex.o", LESS_WARNS, SRC"clex.c");
 
 	for (int i = 0; i < a; ++i) {
-		if (!nob_cmd_run(&cmds[i], .async = &procs)) {
+		if (debug)
+			nob_cmd_append(&cmds[i], DEBUG);
+
+		if (!nob_cmd_run(&cmds[i], .async = &procs))
 			compile_ok = false;
-		}
 	}
 
 	nob_cmd_append(&linkcmd, LINK, BLD"main.o", BLD"cli.o", BLD"clex.o", BLD"clex_util.o", BLD"nob.o", BLD"output.o", BLD"gen_ir.o");
