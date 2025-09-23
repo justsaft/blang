@@ -77,47 +77,25 @@ enum Returns : uint8_t {
 };
 
 enum Ops : uint8_t {
-	/*
-	unary ::=
-		-
-		!
-
-	binary ::=
-		|
-		&
-		==
-		!=
-		<
-		<=
-		>
-		>=
-		<<
-		>>
-		-
-		+
-		%
-		*
-		/
-*/
 	NoOp,
-	UnaryMinus,
-	UnaryBoolean,
-	Pipe,
-	BitwiseOr,
-	BitwiseAnd,
 	Equals,
-	NotEquals,
-	LessThan,
-	LessOrEqualThan,
-	GreaterThan,
-	GreaterOrEqualThan,
-	ShiftLeft,
-	ShiftRight,
-	Minus,
-	Plus,
-	Mod,
-	Mult,
-	Div,
+	UnaryMinus, // -
+	UnaryBoolean, // !
+	BitwiseOr, // |
+	BitwiseAnd, // &
+	EqualsEquals, // ==
+	NotEquals, // !=
+	LessThan, // <
+	LessOrEqualThan, // <=
+	GreaterThan, // >
+	GreaterOrEqualThan, // >=
+	ShiftLeft, // <<
+	ShiftRight, // >>
+	Minus, // -
+	Plus, // +
+	Mod, // %
+	Mult, // *
+	Div, // /
 	// Non-B ops:
 	MinusEquals,
 	PlusEquals,
