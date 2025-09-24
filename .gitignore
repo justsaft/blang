@@ -21,3 +21,4 @@ CMakeSettings.json
 *.ll
 .vscode/settings.json
 .vs
+!.vs/launch.vs.json

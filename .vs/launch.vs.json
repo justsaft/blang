@@ -1,0 +1,14 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "name": "blang.exe 021-assignment.b",
+      "project": "CMakeLists.txt",
+      "projectTarget": "blang.exe",
+      "args": [ "..\\..\\..\\b_src\\021-assignment.b" ],
+      "stopAtConnect": true,
+      "stopOnEntry": true
+    }
+  ]
+}
