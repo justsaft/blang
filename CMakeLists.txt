@@ -4,14 +4,8 @@ cmake_minimum_required(VERSION 3.27)
 # Project name and languages
 project(blang LANGUAGES C CXX)
 
-# Set output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
-
 # Source directories
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
-set(BLD_DIR "${CMAKE_BINARY_DIR}/build")
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 
@@ -45,7 +39,7 @@ file(GLOB HEADER_FILES
 add_executable(blang
     ${CPP_SOURCES}
     ${C_SOURCES}
-    #${HEADER_FILES}
+    ${HEADER_FILES}
 )
 
 # compile options
