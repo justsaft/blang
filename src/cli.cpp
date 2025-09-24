@@ -18,27 +18,37 @@ static void usage(const char* program_name)
 {
 	const char* substr_program_name = strrchr(program_name, '/') + 1;
 
-	fprintf(stderr, "Usage: %s <Options | Input Files> ...\n", substr_program_name == NULL ? program_name : substr_program_name);
+	fprintf(stderr, "Usage: %s <Options | Input Files> ...\n",
+			substr_program_name == NULL ? program_name : substr_program_name);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  -h, --help           Show this help message\n");
 	fprintf(stderr, "  -v, --version        Show version information\n");
 	fprintf(stderr, "  -o, --output         Specify output file\n");
 	fprintf(stderr, "  -t, --target         Specify the target triple\n");
-	fprintf(stderr, "  -c, --only-compile   Specify the target triple\n");
 	fprintf(stderr, "  --print-target       Prints the target triple and exits.\n");
-	fprintf(stderr, "  --emit-ir            Emit only the intermediate representation\n");
-	fprintf(stderr, "  --keep-ir            Keep the generated intermediate representation\n");
-	fprintf(stderr, "  --bext               TODO\n");
-	fprintf(stderr, "  --historical         TODO\n");
+	fprintf(stderr, "\nCompilation:\n");
+	fprintf(stderr, "  -c, --compile   		Only compile (do not produce an excutable)\n");
+	fprintf(stderr, "  --emit-ir            Emit only the IR\n");
+	fprintf(stderr, "  --keep-ir            Keep the generated IR (default)\n");
+	fprintf(stderr, "\nLanguage:\n");
+	fprintf(stderr, "  --bext               Use the same compile standard as B-Ext\n");
+	fprintf(stderr, "                       (implies --modern --largeint)\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "  --historical         Use the original 16-Bit compile standard as B (default)\n");
 	fprintf(stderr, "  --modern             Enable modern language features\n");
-	fprintf(stderr, "  --largeint           TODO\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "  --largeint           Use 64-Bit integers (word size)\n");
 }
 
 static void version(void)
 {
-	fprintf(stderr, "Version: 0.0.3\n");
+	fprintf(stderr, "Version: 0.0.4\n");
 	fprintf(stderr, "Build date: %s\n", __DATE__);
 	fprintf(stderr, "Build time: %s\n", __TIME__);
+#if defined(DEBUG)
+	fprintf(stderr, "THIS BUILD WAS BUILT WITH -DDEBUG\n");
+	fprintf(stderr, "            Debug build.\n");
+#endif
 }
 
 void parse_cli_arguments(int argc, char** argv, std::string& target_override, std::string& output_override, B_Files& input_files, Compilation& comp)
