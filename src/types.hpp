@@ -14,8 +14,6 @@ typedef SSIZE_T ssize_t;
 #include <string>
 #include <map>
 
-#define local thread_local static
-
 extern "C" {
 #include "../3rd-party/stb_c_lexer.h"
 }
