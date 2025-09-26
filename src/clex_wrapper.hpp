@@ -11,8 +11,10 @@ extern "C" {
 #include "common.hpp"
 #include "string.h"
 
-void unexpected_eof(const char* filename, const stb_lexer& l, stb_lex_location& lo);
-void unexpected_eof(const char* filename, const stb_lexer& l);
+constexpr int CLEX_BUFFER_DEFAULT_SIZE = 0x1000;
+
+void unexpected_eof(const char* filename, const stb_lexer&, stb_lex_location&);
+void unexpected_eof(const char* filename, const stb_lexer&);
 
 
 enum CLEX_expansion {
@@ -23,10 +25,10 @@ enum CLEX_expansion {
 };
 
 
-typedef struct FatToken {
-    int token;
-    const char* data;
-} FatToken;
+// typedef struct FatToken {
+// 	int token;
+// 	const char* data;
+// } FatToken;
 
 
 // FatToken make_fat_token(int token, const char* data)
@@ -35,12 +37,12 @@ typedef struct FatToken {
 // }
 
 
-typedef struct LexedStatement {
-    bool assigns;
-    bool has_funccall;
-    std::vector<FatToken> tokens;
-    // Returns error = Success;
-} LexedStatement;
+// typedef struct LexedStatement {
+// 	bool assigns;
+// 	bool has_funccall;
+// 	std::vector<FatToken> tokens;
+// 	// Returns error = Success;
+// } LexedStatement;
 
 
 typedef struct Lexer {
@@ -58,9 +60,6 @@ public:
     Lexer()
     {
         m_ClexBuffer.reserve(CLEX_BUFFER_DEFAULT_SIZE);
-        memset(&m_Location, 0, sizeof(m_Location));
-        memset(&m_Lexer, 0, sizeof(m_Lexer));
-        m_FileName = nullptr;
     }
 
     ~Lexer() = default;
@@ -87,27 +86,27 @@ public:
         return m_Lexer;
     }
 
-    LexedStatement LexStatement(void) const
-    {
-        constexpr FatToken LastInStatement = { ';', nullptr };
-        LexedStatement result;
-        for (; m_Lexer.token != LastInStatement.token;) {
-            result.tokens.push_back(FatToken { (int)m_Lexer.token, strdup(m_Lexer.string) });
-        }
-        return result;
-    }
+    //LexedStatement LexStatement(void) const
+    //{
+    //	constexpr FatToken LastInStatement = { ';', nullptr };
+    //	LexedStatement result;
+    //	for (; m_Lexer.token != LastInStatement.token;) {
+    //		result.tokens.push_back(FatToken { (int)m_Lexer.token, strdup(m_Lexer.string) });
+    //	}
+    //	return result;
+    //}
 
-    FatToken GetFatToken(void) const
-    {
-        // const char* new_data = nullptr;
-        // switch (m_Lexer.token) {
-        // case 260:
-        //     new_data = m_Lexer.string;
-        // default:
-        //     NOB_UNREACHABLE("Switch on token for FatToken data");
-        // }
-        return FatToken { (int)m_Lexer.token, strdup(m_Lexer.string) };
-    }
+    //FatToken GetFatToken(void) const
+    //{
+    //	// const char* new_data = nullptr;
+    //	// switch (m_Lexer.token) {
+    //	// case 260:
+    //	//     new_data = m_Lexer.string;
+    //	// default:
+    //	//     NOB_UNREACHABLE("Switch on token for FatToken data");
+    //	// }
+    //	return FatToken { (int)m_Lexer.token, strdup(m_Lexer.string) };
+    //}
 
     stb_lex_location GetLocation(void) const
     {
@@ -147,7 +146,6 @@ public:
             default:
                 nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected semicolon.",
                         m_FileName, m_Location.line_number, m_Location.line_offset);
-                Compilation_error(ExpectedSemicolon);
                 return ExpectedSemicolon; // Didn't get a semicolon
         }
     }
@@ -237,16 +235,33 @@ public:
         return true;
     }
 
+    void IncreaseBufferSize(size_t size)
+    {
+        size += m_ClexBuffer.capacity();
+        m_ClexBuffer.resize(size);
+    }
+
+    void IncreaseBufferSizeMult(size_t size)
+    {
+        size *= m_ClexBuffer.capacity();
+        m_ClexBuffer.resize(size);
+    }
+
     Returns InitAndLoadFile(const char* filename)
     {
-        if (m_ClexInputStream.count > m_ClexBuffer.size())
-            m_ClexBuffer.resize(m_ClexBuffer.size() + m_ClexInputStream.count);
+        if (m_ClexInputStream.count > m_ClexBuffer.capacity())
+            m_ClexBuffer.resize(m_ClexInputStream.count);
 
         m_ClexInputStream.count = 0;
+        m_ClexBuffer.clear();
+
+        if (m_FileName)
+            free((void*)m_FileName);
+
         m_FileName = strdup(filename);
 
         if (!nob_read_entire_file(m_FileName, &m_ClexInputStream)) {
-            Compilation_error(ErrorReadInput);
+            nob_log(NOB_ERROR, "Could not load file %s.", m_FileName);
             return ErrorReadInput;
         }
 
@@ -254,10 +269,7 @@ public:
 
         if (!stb_c_lexer_get_token(&m_Lexer)) {
             nob_log(NOB_ERROR, "File %s is empty.", m_FileName);
-            Compilation_error(FileEmpty);
             return FileEmpty;
-        } else {
-            nob_log(NOB_INFO, "%s: compiling", m_FileName);
         }
 
         switch (m_Lexer.token) {
@@ -266,7 +278,6 @@ public:
 
             case CLEX_parse_error:
                 nob_log(NOB_ERROR, "CLEX parse error: likely an issue with the buffer");
-                Compilation_error(EverythingCouldBeWrong);
                 return EverythingCouldBeWrong; // Shutup the compiler
 
             default:
@@ -277,11 +288,11 @@ public:
     }
 
 private:
-    const char* m_FileName;
-    stb_lexer m_Lexer;
-    stb_lex_location m_Location;
-    std::vector<char> m_ClexBuffer;
-    Nob_String_Builder m_ClexInputStream = { nullptr, 0, 0 };
+    const char* m_FileName = NULL;
+    stb_lexer m_Lexer { };
+    stb_lex_location m_Location { };
+    std::vector<char> m_ClexBuffer { };
+    Nob_String_Builder m_ClexInputStream { };
 } Lexer;
 
 #endif
