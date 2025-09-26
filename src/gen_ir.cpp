@@ -2,25 +2,58 @@
 #include "types.hpp"
 #include "gen_ir.hpp"
 #include "common.hpp"
+#include "compilation.hpp"
 
 extern "C" {
 #include "../3rd-party/nob.h"
 #include "../3rd-party/stb_c_lexer.h"
 }
 
-static const char* sixteen_bit_int = "i16";
-static const char* sixtyfour_bit_int = "i64";
+extern Compilation c;
 
-static std::map<Value_Type, const char*> VT_to_LLVM = {
-	{ Invalid_Value_Type, "errortype" },
-	{ Dead, "errortype" },
-	{ Uninitialized, "uninitialized" },
-	{ Void, "void" },
-	{ Int, nullptr },
-	{ Float, "f64" },
-	{ String, "todostr" },
-	{ Pointer, "todoptr" },
+
+static std::array<std::tuple<const char*, int>, 2> int_variants = {
+	std::make_tuple("i16", 2),
+	std::make_tuple("i64", 8),
 };
+
+static std::map<Value_Type, std::tuple<const char*, int>> VT_to_LLVM = {
+	{ Invalid_Value_Type, std::make_tuple("invalid", 0) },
+	{ Dead, std::make_tuple("errortype", 0) },
+	{ Uninitialized, std::make_tuple("uninitialized", 0) },
+	{ Void, std::make_tuple("void", 0) },
+	{ Int, std::make_tuple(nullptr, 0) },
+	{ Float, std::make_tuple("f64", 8) },
+	{ String, std::make_tuple("todostr", 0) },
+	{ Pointer, std::make_tuple("todoptr", 0) },
+};
+
+inline void LLVM_IR::append_vt(Value_Type vt)
+{
+	append(std::get<const char*>(VT_to_LLVM.at(vt)));
+	// If this fails with vt == Int then you forgot to run setup_ir_gen()
+}
+
+inline void LLVM_IR::append_align(Value_Type vt)
+{
+	append("align ");
+	append(std::to_string(std::get<int>(VT_to_LLVM.at(vt))));
+}
+
+inline void LLVM_IR::append_vid(Variable_Id vid)
+{
+	if (vid == Invalid_Value_Type) {
+		append_vt(Invalid_Value_Type);
+	} else {
+		append(std::to_string(vid));
+	}
+}
+
+inline void LLVM_IR::nl(void)
+{
+	push_back('\n');
+}
+
 
 
 // ----------------------------
@@ -32,45 +65,23 @@ static std::map<Value_Type, const char*> VT_to_LLVM = {
 
 // Setup
 // -----
-void setup_ir_gen(const Compilation& c)
+void setup_ir_gen(void)
 {
-	switch (c.GetWordSize()) {
-		case SixteenBit: VT_to_LLVM.at(Int) = sixteen_bit_int; break;
-		case SixtyfourBit: VT_to_LLVM.at(Int) = sixtyfour_bit_int; break;
-	}
-}
-
-
-// Internal misc.
-// --------------
-inline void append_vt(LLVM_IR& ir, Value_Type vt)
-{
-	ir.append(VT_to_LLVM.at(vt));
+	VT_to_LLVM.at(Int) = int_variants.at(c.GetWordSize());
 }
 
 
 // file header
 // -----------
 
-void gen_file_ir_info(LLVM_IR& ir, const char* target, const char* file_name)
+void gen_file_info(LLVM_IR& ir, const char* file_name)
 {
 	ir += "source_filename = \"";
-	ir += file_name;
+	ir.append(file_name);
 	ir += "\"\n";
 	ir += "target triple = \"";
-	ir += target;
+	ir.append(c.target);
 	ir += "\"\n\n";
-}
-
-
-// function attributes
-// -------------------
-
-void gen_func_attr_group(LLVM_IR& ir, int group)
-{
-	ir += "\nattributes #";
-	ir.append(std::to_string(group));
-	ir += " = {  }";
 }
 
 
@@ -90,7 +101,7 @@ void gen_func_begin(LLVM_IR& ir, const B_Function& sym)
 {
 	ir += "\n";
 	ir += "define dso_local ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " @";
 	ir.append(sym.name);
 	ir += "() #";
@@ -121,9 +132,9 @@ void gen_funccall(LLVM_IR& ir, Variable_Id retval_dest, const std::string& calle
 {
 	// %4 = call i64 @print1()
 	ir += "  %";
-	ir.append(std::to_string(retval_dest));
+	ir.append_vid(retval_dest);
 	ir += " = call ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " @";
 	ir.append(callee);
 	ir += "()\n";
@@ -133,9 +144,9 @@ void gen_funccall_extrn(LLVM_IR& ir, Variable_Id retval_dest, const std::string&
 {
 	NOB_TODO("Extrn function calls");
 	ir += "  %";
-	ir.append(std::to_string(retval_dest));
+	ir.append_vid(retval_dest);
 	ir += " = call ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " @";
 	ir.append(callee);
 	ir += "()\n";
@@ -145,7 +156,7 @@ void gen_funccall(LLVM_IR& ir, const std::string& callee)
 {
 	// call void @print1()
 	ir += "  call ";
-	append_vt(ir, Void);
+	ir.append_vt(Void);
 	ir += " @";
 	ir += callee;
 	ir += "()\n";
@@ -173,10 +184,12 @@ void gen_gvar_decl(LLVM_IR& ir, const B_Variable& v, const std::string& value)
 	ir += "@";
 	ir.append(v.name);
 	ir += " = dso_local global ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " ";
 	ir.append(value);
-	ir += ", align 8\n";
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_alloca(LLVM_IR& ir, Variable_Id id)
@@ -184,35 +197,41 @@ void gen_alloca(LLVM_IR& ir, Variable_Id id)
 	ir += "  %";
 	ir.append(std::to_string(id));
 	ir += " = alloca ";
-	append_vt(ir, Int);
-	ir += ", align 8\n";
+	ir.append_vt(Int);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_store_gvar_dest_ptrsrc(LLVM_IR& ir, const std::string& dest, const Variable_Id ptrsrc)
 {
 	ir += "  store ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " ";
 	ir.append(dest);
 	ir += ", ptr %";
-	ir.append(std::to_string(ptrsrc));
-	ir += ", align 8\n";
+	ir.append_vid(ptrsrc);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 
 // assignments
 // -----------
 
-void gen_assignment_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src)
+void gen_load_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src)
 {
 	//   %1 = load i64, ptr @globvar, align 8
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = load ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += ", ptr @";
 	ir.append(src);
-	ir += ", align 8\n";
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 	// yields a pointer!
 }
 
@@ -220,35 +239,41 @@ void gen_store_rval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::str
 {
 	// store i64 45, ptr @globvar2, align 8
 	ir += "  store ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " ";
 	ir.append(dest);
 	ir += ", ptr @";
 	ir.append(value);
-	ir += ", align 8\n";
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_store_lval_to_gvar(LLVM_IR& ir, const std::string& dest, const Variable_Id src)
 {
 	// store i64 45, ptr @globvar2, align 8
-	ir += "  store i64";
-	append_vt(ir, Int);
+	ir += "  store ";
+	ir.append_vt(Int);
 	ir += " %";
-	ir.append(std::to_string(src));
+	ir.append_vid(src);
 	ir += ", ptr @";
 	ir.append(dest);
-	ir += ", align 8\n";
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_store_gval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& src)
 {
 	ir += "  store ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " @";
 	ir.append(src);
 	ir += ", ptr @";
 	ir.append(dest);
-	ir += ", align 8\n";
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_store_rval_to_lval(LLVM_IR& ir, const Variable_Id dest, const std::string& value)
@@ -275,12 +300,14 @@ void gen_store_rval_to_lval(LLVM_IR& ir, const Variable_Id dest, const std::stri
 	  store i64 % 11, ptr % 2, align 8 */
 
 	ir += "  store ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " ";
 	ir.append(value);
 	ir += ", ptr %";
-	ir.append(std::to_string(dest));
-	ir += ", align 8\n";
+	ir.append_vid(dest);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_store_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
@@ -288,35 +315,41 @@ void gen_store_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_
 	// ir += "  %";
 	// ir += " = store i64 %";
 	ir += "  store ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " %";
-	ir.append(std::to_string(src));
+	ir.append_vid(src);
 	ir += ", ptr %";
-	ir.append(std::to_string(dest));
-	ir += ", align 8\n";
+	ir.append_vid(dest);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_load_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
 {
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = load ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += ", ptr %";
-	ir.append(std::to_string(src));
-	ir += ", align 8\n";
+	ir.append_vid(src);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 void gen_load_lvalptr_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src)
 {
 	// %1 = load i64* %2, align 8
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = load ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += "* %";
-	ir.append(std::to_string(src));
-	ir += ", align 8\n";
+	ir.append_vid(src);
+	ir += ", ";
+	ir.append_align(Int);
+	ir.nl();
 }
 
 
@@ -326,14 +359,14 @@ void gen_load_lvalptr_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variabl
 void gen_return_keyword(LLVM_IR& ir)
 {
 	ir += "  ret ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " 0\n";
 }
 
 void gen_return_keyword_rvalue(LLVM_IR& ir, const std::string& n)
 {
 	ir += "  ret ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " ";
 	ir.append(n);
 	ir += "\n";
@@ -342,15 +375,15 @@ void gen_return_keyword_rvalue(LLVM_IR& ir, const std::string& n)
 void gen_return_keyword_lvalue(LLVM_IR& ir, Variable_Id n)
 {
 	ir += "  ret ";
-	append_vt(ir, Int);
+	ir.append_vt(Int);
 	ir += " %";
-	ir.append(std::to_string(n));
+	ir.append_vid(n);
 	ir += "\n";
 }
 
 
-// Plus op
-// -------
+// Binary Ops
+// ----------
 
 /*
   %7 = load i64, ptr %4, align 8
@@ -368,15 +401,16 @@ void gen_return_keyword_lvalue(LLVM_IR& ir, Variable_Id n)
   store i64 %15, ptr %2, align 8 // result
  */
 
-void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Variable_Scope& sc, const Ops op)
+
+void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Scope& sc, const Ops op)
 {
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = ";
 
-	Value_Type& dest_type = sc.at(dest).value_type;
-	Value_Type vta = sc.at(left).value_type;
-	Value_Type vtb = sc.at(right).value_type;
+	Value_Type& dest_type = sc.GetVariableFromStack(dest).value_type;
+	Value_Type vta = sc.GetVariableFromStack(left).value_type;
+	Value_Type vtb = sc.GetVariableFromStack(right).value_type;
 
 	switch (((bool)(vta == Int) << 3) +
 			((bool)(vta == Float) << 2) +
@@ -427,21 +461,22 @@ void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, 
 	}
 
 	ir += " ";
-	ir.append(VT_to_LLVM.at(dest_type));
+	ir.append_vt(dest_type);
 	ir += " %";
-	ir.append(std::to_string(left));
+	ir.append_vid(left);
 	ir += ", %";
-	ir.append(std::to_string(right));
+	ir.append_vid(right);
 	ir += "\n";
 }
 
-void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Variable_Scope& sc, const Ops op)
+
+void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Scope& sc, const Ops op)
 {
-	Value_Type& dest_vt = sc.at(dest).value_type;
-	dest_vt = sc.at(src).value_type;
+	Value_Type& dest_vt = sc.Variables().at(dest).value_type;
+	dest_vt = src < 0 ? sc.UpstreamVariables()[-src].value_type : sc.Variables()[src].value_type;
 
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = ";
 
 	switch (op) {
@@ -452,12 +487,12 @@ void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_
 
 	switch (dest_vt) {
 		case Float:
-		case Int: ir.append(VT_to_LLVM.at(dest_vt)); break;
+		case Int: ir.append_vt(dest_vt); break;
 		default: NOB_UNREACHABLE("Unknown operation");
 	}
 
 	ir += " %";
-	ir.append(std::to_string(src));
+	ir.append_vid(src);
 	ir += "\n";
 }
 
@@ -469,9 +504,9 @@ void gen_downsize_cast(LLVM_IR& ir, Variable_Id dest, Variable_Id src)
 {
 	//%12 = trunc i64 %11 to i32
 	ir += "  %";
-	ir.append(std::to_string(dest));
+	ir.append_vid(dest);
 	ir += " = trunc i64 %";
-	ir.append(std::to_string(src));
+	ir.append_vid(src);
 	ir += " to i32\n";
 }
 

@@ -13,16 +13,12 @@ typedef SSIZE_T ssize_t;
 #include <vector>
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <tuple>
 
 extern "C" {
 #include "../3rd-party/stb_c_lexer.h"
 }
-
-enum Backend : uint8_t {
-	Backend_LLC,
-	Backend_CLANG,
-	TotalAmountOfBackends,
-};
 
 enum IR_Output : uint8_t {
 	DeleteIrAfterCompile,
@@ -72,6 +68,7 @@ enum Returns : uint8_t {
 	MultipleEntryPoints,
 	LangFeatureUnavailable,
 	TotalAmountOfReturns,
+	FileNotCompiledYet,
 };
 
 enum Ops : uint8_t {
@@ -107,7 +104,7 @@ enum Ops : uint8_t {
 	OpsTotalAmount,
 };
 
-enum Keyword : uint8_t {
+enum Keywords : uint8_t {
 	NotKeyword,
 	Return,
 	Auto,
@@ -132,20 +129,19 @@ enum Value_Type : uint8_t {
 	Float,
 };
 
-// this is cringe but works well enough
-typedef std::vector<const char*> CStrings;
-
-typedef std::string LLVM_IR;
 typedef ssize_t Function_Id;
 typedef ssize_t Variable_Id;
 
-constexpr int CLEX_BUFFER_DEFAULT_SIZE = 0x1000;
-constexpr int MAX_ERRORS_BEFORE_STOP = 15;
-constexpr int WHERES_YOUR_GOD_NOW = INT32_MAX;
+struct LLVM_IR : std::string {
+	inline void append_vt(Value_Type vt);
+	inline void append_align(Value_Type vt);
+	inline void append_vid(Variable_Id vid);
+	inline void nl(void); // New line
+};
 
 struct B_File {
 	const char* filepath;
-	Returns state = Success;
+	Returns state = FileNotCompiledYet;
 };
 
 typedef std::vector<B_File> B_Files;
@@ -156,16 +152,11 @@ typedef std::vector<B_File> B_Files;
 //		line_offset = -1;
 //};
 
-//typedef struct Scope {
-//	int depth = 0;
-//};
-
 struct B_Variable {
 	const char* name = nullptr;
 	Value_Type value_type = Dead;
-	int in_file = -1;
-	stb_lex_location location = { -1, -1 };
-	LLVM_IR ir = ""; // TODO: remove so I won't break SSA again
+	int in_file;
+	stb_lex_location location;
 	bool global = false;
 };
 
@@ -185,114 +176,114 @@ struct B_Function {
 //	std::vector<B_ItemLocation> locations;
 //};
 
-struct Compilation {
-public:
-	bool stop = false,
-		has_entry = false,
-		wants_executable = true;
-
-	int current_file = 0,
-		errors = 0,
-		warnings = 0;
-
-	Returns state = Success;
-
-public:
-	LangMode GetLangMode(void) const
-	{
-		return lang_mode;
-	}
-
-	WordSize GetWordSize(void) const
-	{
-		return word_size;
-	}
-
-	IR_Output GetIROutput(void) const
-	{
-		return irout;
-	}
-
-	bool IsLangMode(LangMode lm) const
-	{
-		return lang_mode == lm;
-	}
-
-	bool IsWordSize(WordSize ws) const
-	{
-		return word_size == ws;
-	}
-
-	bool IsIROutput(IR_Output iro) const
-	{
-		return irout == iro;
-	}
-
-protected:
-	friend void parse_cli_arguments(int, char**, std::string&, std::string&, B_Files&, Compilation&);
-
-	void SetLangMode(LangMode lm)
-	{
-		lang_mode = lm;
-	}
-
-	void SetWordSize(WordSize ws)
-	{
-		word_size = ws;
-	}
-
-	void SetIROutput(IR_Output iro)
-	{
-		irout = iro;
-	}
-
-private:
-	LangMode lang_mode = Historical;
-	WordSize word_size = SixteenBit;
-	IR_Output irout = DeleteIrAfterCompile;
-};
-
 typedef std::vector<B_Variable> B_Variable_Scope;
 typedef std::vector<B_Function> B_Function_Scope;
 //typedef std::map<std::string, std::vector<B_FunctionInfo>> B_FunctionScope_New;
 
+struct B_Scope {
+public:
+	static B_Function_Scope functions; // For all scopes
+	static B_Function_Scope extern_functions; // For all scopes
 
-// POS Types
-typedef struct B_Scope {
-	static B_Function_Scope& functions; // For all files
-	static B_Function_Scope& extern_functions; // For a file
-	B_Variable_Scope upstreamv;
-	B_Variable_Scope localv;
+public:
+	const B_Variable_Scope& UpstreamVariables(void) const
+	{
+		return upstreamv;
+	}
 
+	B_Variable_Scope& Variables(void)
+	{
+		return localv;
+	}
+
+	B_Variable_Scope GluedVariables(void)
+	{
+		B_Variable_Scope temp;
+		temp.resize(localv.size() + upstreamv.size());
+		temp.insert(temp.end(), upstreamv.begin(), upstreamv.end());
+		temp.insert(temp.end(), localv.begin(), localv.end());
+		return temp;
+	}
+
+	Variable_Id GetTopOfStack(void) const
+	{
+		return localv.size() + upstreamv.size() - global_variables;
+	}
+
+	B_Variable& GetVariableFromStack(Variable_Id id)
+	{
+		ssize_t uv = upstreamv.size() - global_variables;
+		return id >= uv ? localv[-uv + id] : upstreamv[id];
+	}
+
+	Variable_Id LocalId2StackId(Variable_Id localid) const
+	{
+		return upstreamv.size() - global_variables + localid;
+	}
+
+	Variable_Id UpstreamId2StackId(Variable_Id l) const
+	{
+		return l - global_variables;
+	}
+
+	ssize_t GetAmountGlobalVars(void) const
+	{
+		return global_scope ? localv.size() : global_variables;
+	}
+
+	bool IsGlobalScope(void) const
+	{
+		return global_scope;
+	}
+
+public:
 	B_Scope()
 	{
-		localv.reserve(2);
-		localv.push_back(B_Variable { });
+		localv.reserve(6);
+		functions.reserve(6);
+		extern_functions.reserve(6);
 	}
 
 	B_Scope(const B_Scope& upstr)
-	{ // uuuuhhh
-		localv.reserve(2);
-
+	{
 		upstreamv.resize(upstr.localv.size() + upstr.upstreamv.size());
 		upstreamv.insert(upstreamv.end(), upstr.upstreamv.begin(), upstr.upstreamv.end());
 		upstreamv.insert(upstreamv.end(), upstr.localv.begin(), upstr.localv.end());
 
-		localv.push_back(B_Variable { });
+		localv.reserve(6);
+
+		global_scope = false;
+
+		if (upstr.global_scope) {
+			localv.push_back(B_Variable {
+				.value_type = Invalid_Value_Type,
+				.in_file = -1,
+				.location = { -1, -1 },
+				.global = true });
+
+			global_variables = upstr.localv.size();
+		}
 	}
 
 	~B_Scope() = default;
-} B_Scope;
+
+private:
+	static ssize_t global_variables;
+	bool global_scope = true;
+	B_Variable_Scope upstreamv;
+	B_Variable_Scope localv;
+};
 
 enum Reserved_Variable_Ids : Variable_Id {
-	Special_Expr_True = -256,
-	Special_Expr_False,
+	Boolean_Literal_True = -256,
+	Boolean_Literal_False,
 	INVALID_VARIABLE = 0,
 	FIRST_VARIABLE_ID,
 };
 
 constexpr Function_Id INVALID_FUNCTION = -1;
 constexpr Function_Id FIRST_FUNCTION_ID = 0;
-
+constexpr int MAX_ERRORS_BEFORE_STOP = 15;
+constexpr int WHERES_YOUR_GOD_NOW = INT32_MAX;
 
 #endif

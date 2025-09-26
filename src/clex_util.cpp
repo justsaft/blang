@@ -93,12 +93,12 @@ uint8_t semicolon_next(stb_lexer& l, const char* filename, bool advance_pre, boo
         default:
             //NOB_TODO("Unwind after missing semicolon");
             nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected semicolon.", filename, pos.line_number, pos.line_offset);
-            Compilation_error(ExpectedSemicolon);
+            // Compilation_error(ExpectedSemicolon);
             return ExpectedSemicolon; // Didn't get a semicolon
     }
 }
 
-bool expect_token(stb_lexer& l, long token/* , bool silent */)
+bool expect_token(stb_lexer& l, const long token/* , bool silent */)
 {
     return l.token == token;
     /* else if (!silent) {

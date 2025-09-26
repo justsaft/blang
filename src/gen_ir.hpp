@@ -3,7 +3,6 @@
 #define _GEN_IR_HPP
 
 #include "types.hpp"
-extern Compilation compilation;
 
 
 // gen_ir.cpp
@@ -11,12 +10,12 @@ extern Compilation compilation;
 
 // Setup
 // -----
-void setup_ir_gen(const Compilation& c);
+void setup_ir_gen(void);
 
 
 // file header
 // -----------
-void gen_file_ir_info(LLVM_IR& ir, const char* target, const char* file_name);
+void gen_file_info(LLVM_IR& ir, const char* file_name);
 
 
 // function bodies
@@ -52,7 +51,7 @@ void gen_store_rval_to_lval(LLVM_IR& ir, const Variable_Id dest, const std::stri
 void gen_store_lval_to_gvar(LLVM_IR& ir, const std::string& dest, const Variable_Id src);
 void gen_store_gval_to_gvar(LLVM_IR& ir, const std::string& dest, const std::string& src);
 void gen_store_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
-void gen_assignment_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src);
+void gen_load_gvar_to_lvar(LLVM_IR& ir, const Variable_Id dest, const std::string& src);
 void gen_load_lval_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
 void gen_load_lvalptr_to_lval(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src);
 
@@ -67,8 +66,8 @@ void gen_return_keyword_lvalue(LLVM_IR& ir, Variable_Id n);
 // Operations
 // ----------
 
-void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Variable_Scope& sc, const Ops op);
-void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Variable_Scope& sc, const Ops op);
+void gen_binary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id left, const Variable_Id right, B_Scope& sc, const Ops op);
+void gen_unary_op(LLVM_IR& ir, const Variable_Id dest, const Variable_Id src, B_Scope& sc, const Ops op);
 
 // Casting
 // -------

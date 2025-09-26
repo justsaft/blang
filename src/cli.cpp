@@ -5,13 +5,10 @@ extern "C" {
 
 #include <iostream>
 #include <string.h>
-#include <string>
-#include <array>
-#include <memory>
-#include <cstdio>
 
 #include "types.hpp"
 #include "common.hpp"
+#include "compilation.hpp"
 
 
 static void usage(const char* program_name)
@@ -37,7 +34,7 @@ static void usage(const char* program_name)
 	fprintf(stderr, "  --historical         Use the original 16-Bit compile standard as B (default)\n");
 	fprintf(stderr, "  --modern             Enable modern language features\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "  --largeint           Use 64-Bit integers (word size)\n");
+	fprintf(stderr, "  --largeword          Use 64-Bit integers (word size)\n");
 }
 
 static void version(void)
@@ -51,7 +48,7 @@ static void version(void)
 #endif
 }
 
-void parse_cli_arguments(int argc, char** argv, std::string& target_override, std::string& output_override, B_Files& input_files, Compilation& comp)
+void parse_cli_arguments(int argc, char** argv, B_Files& input_files, Compilation& comp)
 {
 	bool print_target_flag = false;
 
@@ -81,7 +78,7 @@ void parse_cli_arguments(int argc, char** argv, std::string& target_override, st
 				nob_log(NOB_ERROR, "No output file name provided after `--output` or `-o`.");
 				exit(UnexpectedArguments);
 			}
-			output_override = argv[arg];
+			comp.output = argv[arg];
 			duplicate_o = true;
 
 		} else if ((strcmp(argv[arg], "-t") == 0) ||
@@ -93,18 +90,18 @@ void parse_cli_arguments(int argc, char** argv, std::string& target_override, st
 				Compilation_error(UnexpectedArguments);
 			}
 			++arg;
-			if (argc <= arg) { // TODO: This check is weird
+			if (argc <= arg) {
 				nob_log(NOB_ERROR, "No target triple provided after `--target` or `-t`.");
 				Compilation_error(UnexpectedArguments);
 			}
 			duplicate_t = true;
-			target_override = argv[arg];
-			if (strncmp(target_override.data(), "/dev/", 5) == 0) {
+			comp.target = argv[arg];
+			if (strncmp(comp.target.data(), "/dev/", 5) == 0) {
 				comp.SetIROutput(DontCompile); // TODO: Why is this here again?
 			}
 
 		} else if ((strcmp(argv[arg], "-c") == 0) ||
-				   (strcmp(argv[arg], "--only-compile") == 0)) {
+				   (strcmp(argv[arg], "--compile") == 0)) {
 
 			comp.wants_executable = false;
 
@@ -127,7 +124,7 @@ void parse_cli_arguments(int argc, char** argv, std::string& target_override, st
 		} else if (strcmp(argv[arg], "--historical") == 0) {
 			comp.SetLangMode(Historical);
 
-		} else if (strcmp(argv[arg], "--largeint") == 0) {
+		} else if (strcmp(argv[arg], "--largeword") == 0) {
 			comp.SetWordSize(SixtyfourBit);
 
 		} else { // input files
@@ -143,7 +140,7 @@ void parse_cli_arguments(int argc, char** argv, std::string& target_override, st
 	if (print_target_flag) {
 		// This feels like a hack² but I feel it should
 		// always print the target, even if it is supplied.
-		fprintf(stdout, "%s\n", target_override.c_str());
+		fprintf(stdout, "%s\n", comp.target.c_str());
 		exit(Success);
 	}
 }

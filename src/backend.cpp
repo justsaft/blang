@@ -2,8 +2,10 @@
 #include <memory>
 #include <stdexcept>
 
+#include "compilation.hpp"
 #include "backend.hpp"
 #include "common.hpp"
+#include "types.hpp"
 
 extern "C" {
 #include "../3rd-party/nob.h"
@@ -16,28 +18,69 @@ extern "C" {
 // 	"aarch64-pc-windows-gnu",
 // };
 
-extern Compilation c;
-std::string get_target_triple_clang(void);
-std::string get_target_triple_llc(void);
-
-const char* backend2str(Backend b)
+const char* Backend::GetCommand(void) const
 {
-    switch (b) {
-        case Backend_CLANG: return "Clang";
-        case Backend_LLC: return "LLC";
-        default: NOB_UNREACHABLE("Unknown backend");
+    switch (backend) {
+        case CLANG: return "clang";
+        case LLC: return "llc";
+        default: NOB_UNREACHABLE("Backend not implmented");
     }
 }
 
-bool is_backend_installed(Backend b)
+void Backend::RunAutofind(void)
+{
+    assert(backend != TotalAmountOfBackends);
+    assert(backend != NoBackendInstalled);
+
+    if (backend == Autofind) {
+        for (uint8_t i = 0; i < TotalAmountOfBackends; ++i)
+            if (is_backend_installed((Backends)i))
+                backend = (Backends)i;
+
+        if (backend == Autofind)
+            backend = NoBackendInstalled;
+    }
+}
+
+bool Backend::Check(void) const
+{
+    switch (backend) {
+        case NoBackendInstalled: NOB_UNREACHABLE("Backend: No backend installed");
+        case Autofind: NOB_UNREACHABLE("Backend: Autofind was not ran");
+        case TotalAmountOfBackends: NOB_UNREACHABLE("Backend: `TotalAmountOfBackends` should not be passed here");
+        default: break;
+    }
+
+    if (!is_backend_installed(backend)) {
+        nob_log(NOB_ERROR, "Cannot continue. Please install `%s`.",
+                backend2str(backend));
+        return false;
+    }
+
+    return true;
+}
+
+const char* backend2str(Backends b)
+{
+    switch (b) {
+        case CLANG: return "Clang";
+        case LLC: return "LLC";
+        case NoBackendInstalled: return "No backend installed"; break;
+        case Autofind: return "Autofind was not triggered"; break;
+        case TotalAmountOfBackends: NOB_UNREACHABLE("backend2str: `TotalAmountOfBackends` should not be passed here");
+        default: NOB_UNREACHABLE("backend2str: Target not implmented");
+    }
+}
+
+bool is_backend_installed(Backends b)
 {
 #if defined(_WIN32)
     FILE* pipe;
 
     switch (b) {
-        case Backend_CLANG: pipe = _popen("clang --version 2>nul", "r");
-        case Backend_LLC: pipe = _popen("llc --version 2>nul", "r");
-        default: NOB_UNREACHABLE("Unknown backend");
+        case CLANG: pipe = _popen("clang --version 2>nul", "r"); break;
+        case LLC: pipe = _popen("llc --version 2>nul", "r"); break;
+        default: NOB_UNREACHABLE("Backend was not set");
     }
 
     if (!pipe) {
@@ -55,9 +98,9 @@ bool is_backend_installed(Backend b)
     FILE* pipe;
 
     switch (b) {
-        case Backend_CLANG: pipe = popen("clang --version 1>/dev/null 2>/dev/null", "r"); break;
-        case Backend_LLC: pipe = popen("llc --version 1>/dev/null 2>/dev/null", "r"); break;
-        default: NOB_UNREACHABLE("Unknown backend");
+        case CLANG: pipe = popen("clang --version 1>/dev/null 2>/dev/null", "r"); break;
+        case LLC: pipe = popen("llc --version 1>/dev/null 2>/dev/null", "r"); break;
+        default: NOB_UNREACHABLE("Backend was not set");
     }
 
     if (!pipe) {
@@ -68,34 +111,18 @@ bool is_backend_installed(Backend b)
 #endif
 }
 
-bool is_backend_installed(void)
-{
-    return is_backend_installed(c.GetBackend());
-}
-
-std::string get_target_triple(const Backend b)
+std::string get_target_triple(Backends b)
 {
     switch (b) {
-        case Backend_CLANG: return get_target_triple_clang(); break;
-        case Backend_LLC: return get_target_triple_llc(); break;
+        case CLANG: return get_target_triple_clang(); break;
+        case LLC: return get_target_triple_llc(); break;
         default: NOB_UNREACHABLE("Unknown backend");
     }
 }
 
-std::string get_target_triple(void)
-{
-    return get_target_triple(c.GetBackend());
-}
-
-// bool is_any_backend_installed(void)
-// {
-//     for (int i = 0; i < TotalAmountOfBackends; ++i)
-//         return is_backend_installed((Backend)i);
-// }
-
 std::string get_target_triple_clang(void)
 {
-#ifdef _WIN32
+#if defined(_WIN32) && false
 
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -162,7 +189,7 @@ std::string get_target_triple_clang(void)
         exit(ErrorWriteOutput);
     }
 
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+    while (fgets(buffer.data(), (int)buffer.size(), pipe.get()) != nullptr) {
         result += buffer.data();
     }
 
@@ -187,14 +214,14 @@ std::string get_target_triple_llc(void)
     std::array<char, 128> buffer { };
     std::string result;
     std::string cmd = "llc --version 2>&1";
-    std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen("clang -print-target-triple", "r"), pclose);
+    std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(cmd.data(), "r"), pclose);
 
     if (!pipe) {
         Compilation_error(ErrorWriteOutput);
         exit(ErrorWriteOutput);
     }
 
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+    while (fgets(buffer.data(), (int)buffer.size(), pipe.get()) != nullptr) {
         result += buffer.data();
     }
 
