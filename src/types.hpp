@@ -186,6 +186,10 @@ public:
 	static B_Function_Scope functions; // For all scopes
 	static B_Function_Scope extern_functions; // For all scopes
 
+	bool is_switch = false;
+	size_t if_started = 0;
+	std::unordered_map<std::string, size_t> labels;
+
 public:
 	const B_Variable_Scope& UpstreamVariables(void) const
 	{
