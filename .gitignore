@@ -1,24 +1,26 @@
-
+*
 !*.cpp
 !*.c
+!*.h
 !*.b
 !*.txt
+!*.json
 !*.md
+!.github/
 !.gitattributes
 !.gitignore
 !Makefile_
 !CMakeLists.txt
+!.vscode/launch.json
+!.vscode/tasks.json
 
-out/
-mat/
-build/
-CMakeFiles/
-blang
-nob
-*.cmake
-CMakeCache.txt
-CMakeSettings.json
-*.ll
-.vscode/settings.json
-.vs
-!.vs/launch.vs.json
+## macOS bullshit
+#**/.DS_Store
+#**/*.dSYM/
+#._*
+
+# ir/
+# out/
+# mat/
+# build/
+# CMakeFiles/
