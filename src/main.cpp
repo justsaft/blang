@@ -24,7 +24,7 @@ constexpr bool _debug = false;
 
 
 // Driver
-bool dispatch_clang(std::string& output_file_name);
+bool dispatch_clang(const std::string& output_file_name);
 
 
 // Parsing
@@ -43,6 +43,12 @@ void backpatch_all_function_calls(const int file, const B_Scope& scope);
 
 // Parse keywords
 Returns parse_auto_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_if_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_else_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_switch_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_goto_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_case_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
+Returns parse_while_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
 Returns parse_extrn_keyword(Lexer&, B_Function_Scope&, const int file);
 Returns parse_return_keyword(Lexer&, LLVM_IR&, B_Scope&, const int file);
 
@@ -61,6 +67,8 @@ bool is_function_redefinition(const B_Function& new_f, const B_Function_Scope& s
 bool is_variable_redefinition(const B_Variable& new_v, const B_Variable_Scope& scope, const int file);
 
 
+Backend backend(CLANG);
+
 // Data Storage
 Compilation c { };
 
@@ -68,7 +76,7 @@ B_Function_Scope B_Scope::functions { };
 B_Function_Scope B_Scope::extern_functions { };
 ssize_t B_Scope::global_variables { };
 
-local B_Files input_files;
+local B_Files input_files { };
 
 
 // Misc
@@ -105,7 +113,7 @@ int main(int argc, char** argv)
 		Compilation_error(NoFilesGiven);
 	}
 
-	std::string current_triple = Backend(CLANG).GetTargetTriple(); // 60ms - 90ms
+	std::string current_triple = backend.GetTargetTriple(); // 60ms - 90ms
 
 	if (c.target.empty()) {
 		c.target.append(current_triple);
@@ -116,6 +124,8 @@ int main(int argc, char** argv)
 	B_Scope global_scope;
 	Lexer lexer;
 	LLVM_IR file_ir;
+
+	file_ir.resize(256);
 
 #if defined(DEBUG) && (COMPILATION_RECAP == ENABLE)
 	std::string resultsbuf;
@@ -131,7 +141,6 @@ int main(int argc, char** argv)
 			// parse_file parses until end of file
 			parse_file(file, global_scope, lexer, file_ir);
 
-		// Once there are no more tokens...
 		backpatch_all_function_calls(file, global_scope);
 
 #if defined(DEBUG) && (COMPILATION_RECAP == ENABLE)
@@ -252,6 +261,7 @@ Returns parse_scope(const int file, B_Scope& scope, Lexer& l, LLVM_IR& ir)
 
 Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 {
+	local std::string primary;
 	l.Locate();
 
 	if (!l.Expect(CLEX_id)) {
@@ -262,19 +272,35 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 		return InvalidSyntax;
 	}
 
-	const char* primary = strdup(l.string);
+	primary.assign(l.string);
+
 	Returns retval = Success;
 
 	switch (check_statement_identifier(primary)) {
-		case Extrn:
-			retval =
-				parse_extrn_keyword(l, sc.extern_functions, file);
-			break; // -> semicolon next
+		case Switch:
+			if (sc.is_switch) {
+				NOB_UNREACHABLE("Nested switch cases not implemented");
+			} else {
+				retval = parse_switch_keyword(l, ir, sc, file); return retval;
+			}
+			return retval; // No semicolon
 
-		case Auto:
-			retval =
-				parse_auto_keyword(l, ir, sc, file);
-			break; // -> semicolon next
+		case Case:
+			if (sc.is_switch) {
+				retval = parse_case_keyword(l, ir, sc, file); return retval;
+				return retval;
+			} else {
+				nob_log(NOB_ERROR, "%s:%d:%d: Syntax error: keyword `case` not valid outside of a switch body.",
+						l.filename, l.location.line_number, l.location.line_offset);
+				return InvalidSyntax;
+			}
+
+		case If: retval = parse_if_keyword(l, ir, sc, file); break; // -> semicolon next
+		case Else: retval = parse_else_keyword(l, ir, sc, file); break; // -> semicolon next
+		case While: retval = parse_while_keyword(l, ir, sc, file); break; // -> semicolon next
+		case Goto: retval = parse_goto_keyword(l, ir, sc, file); break; // -> semicolon next
+		case Extrn: retval = parse_extrn_keyword(l, sc.extern_functions, file); break; // -> semicolon next
+		case Auto: retval = parse_auto_keyword(l, ir, sc, file); break; // -> semicolon next
 
 		case Return:
 			if (sc.IsGlobalScope()) {
@@ -293,19 +319,17 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 			if (l.Expect(CLEX_id)) {
 				nob_log(NOB_ERROR, "%s:%d:%d: Didn't expect identifier `%s` after primary identifier `%s`",
 						l.filename, l.location.line_number, l.location.line_offset,
-						l.string, primary);
+						l.string, primary.c_str());
 				Compilation_error(InvalidSyntax);
-				return InvalidSyntax;
+				return InvalidSyntax; // No semicolon next
 			}
 
-			if (l.Expect(';'))
-				break; // -> semicolon next
+			if (l.Expect(';')) break; // -> semicolon next
 
 			if (sc.IsGlobalScope()) {
 				if (l.Expect('(')) {
 					retval =
-						parse_function_definition(file, sc, l, ir, primary);
-					free((void*)primary);
+						parse_function_definition(file, sc, l, ir, primary.c_str());
 					return retval; // No semicolon, skip call to semicolon_next
 				} else if (l.Expect('=') ||
 						   l.Expect(CLEX_id) ||
@@ -316,7 +340,7 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 					if (l.Expect('='))
 						l.Step();
 
-					retval = parse_assigning_expression(file, sc, l, ir, primary);
+					retval = parse_assigning_expression(file, sc, l, ir, primary.c_str());
 
 				} else {
 					retval = parse_expression(file, sc, l, ir) >= FIRST_VARIABLE_ID
@@ -324,7 +348,7 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 				}
 			} else {
 				if (l.Expect('=')) {
-					retval = parse_assigning_expression(file, sc, l, ir, primary);
+					retval = parse_assigning_expression(file, sc, l, ir, primary.c_str());
 				} else {
 					retval = parse_expression(file, sc, l, ir) >= FIRST_VARIABLE_ID
 						? Success : EverythingCouldBeWrong;
@@ -332,8 +356,8 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 			}
 			break; // -> semicolon next
 
-		default:
-			NOB_TODO("Keyword not yet implemented!");
+		case Invalid_Keyword:
+			NOB_UNREACHABLE("Invalid keyword");
 	}
 
 	if (l.Semicolon() == ExpectedSemicolon) {
@@ -341,7 +365,6 @@ Returns parse_line(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir)
 		retval = ExpectedSemicolon;
 	}
 
-	free((void*)primary);
 	return retval;
 }
 
@@ -767,7 +790,7 @@ Returns parse_assigning_expression(const int file, B_Scope& sc, Lexer& l, LLVM_I
 		default: NOB_UNREACHABLE("This condition should literally be impossible");
 	}
 
-	free((void*)name);
+	// free((void*)name);
 	return retval;
 }
 
@@ -776,7 +799,7 @@ Returns parse_assigning_expression(const int file, B_Scope& sc, Lexer& l, LLVM_I
 
 Keywords check_statement_identifier(const std::string& k)
 {
-	static std::unordered_map<std::string, Keywords> String2Keyword = {
+	const static std::unordered_map<std::string, Keywords> String2Keyword = {
 		{ "extrn", Extrn },
 		{ "auto", Auto },
 		{ "return", Return },
@@ -788,7 +811,12 @@ Keywords check_statement_identifier(const std::string& k)
 		{ "goto", Goto },
 	};
 
-	return String2Keyword.at(k);
+	auto it = String2Keyword.find(k);
+
+	if (it == String2Keyword.end())
+		return NotKeyword;
+
+	return it->second;
 }
 
 Keywords check_statement_identifier(const char* k)
@@ -816,12 +844,66 @@ Keywords check_statement_identifier(const char* k)
 	return NotKeyword;
 }
 
+Returns parse_label(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	// Lexer:
+
+	scope.labels.insert({ l.string, scope.labels.size() });
+	ir.append(nob_temp_sprintf("!%zu", scope.labels.size() - 1));
+
+	// auto it = labels.find(name);
+
+	// if (it == labels.end())
+	// 	NOB_UNREACHABLE("")
+		// return InvalidSyntax;
+
+
+	// ir += nob_temp_sprintf("!%d", it->second);
+	return Success;
+}
+
+Returns parse_goto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("goto not yet implemented");
+}
+
+Returns parse_while_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("while not yet implemented");
+
+}
+
+Returns parse_else_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("else not yet implemented");
+
+}
+
+Returns parse_if_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("if not yet implemented");
+
+}
+
+Returns parse_case_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("case not yet implemented");
+
+}
+
+Returns parse_switch_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
+{
+	NOB_UNREACHABLE("switch not yet implemented");
+
+}
+
 Returns parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
 	l.Step();
 	// auto <<variable>> = 69;
 
-	const char* name = strdup(l.string);
+	local std::string keyword;
+	keyword.assign(l.string);
 
 	if (l.token != CLEX_id) {
 		nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: expected name of variable after this auto keyword.",
@@ -830,7 +912,7 @@ Returns parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file
 		return InvalidSyntax;
 	}
 
-	Returns retval = variable_declaration(file, scope, ir, l.GetLocation(), name);
+	Returns retval = variable_declaration(file, scope, ir, l.GetLocation(), keyword.c_str());
 	// variable_declaration handles push_back
 
 	switch (l.GetNextToken()) {
@@ -838,11 +920,11 @@ Returns parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file
 			unexpected_eof("auto variable declaration");
 			exit(UnexpectedEndOfFile); */
 
-		// TODO: I should probably care about unexpected tokens
+			// TODO: I should probably care about unexpected tokens
 
 		case '=':
 			if (retval == Success) {
-				retval = parse_assigning_expression(file, scope, l, ir, name);
+				retval = parse_assigning_expression(file, scope, l, ir, keyword.c_str());
 			} else {
 				NOB_TODO("Stuff that's gonna happen after non succesful variable declaration");
 			}
@@ -853,12 +935,12 @@ Returns parse_auto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file
 
 		default:
 			nob_log(NOB_ERROR, "%s:%d:%d: Invalid syntax: unexpected token in auto variable declaration for `%s`.",
-					CurrentFile, l.location.line_number, l.location.line_offset, name);
+					CurrentFile, l.location.line_number, l.location.line_offset, keyword.c_str());
 			Compilation_error(InvalidSyntax);
 			return InvalidSyntax;
 	}
 
-	free((void*)name);
+	// delete name;
 
 	return retval;
 }
@@ -1362,11 +1444,6 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 			++c.warnings;
 			break;
 
-
-			// nob_log(NOB_ERROR, "No function definitions found in any passed file. Define main as `main() { ... }`");
-			// ++compilation.errors;
-			// break;
-
 		case NoEntryPoint:
 			// Assumes that compilation WANTS an executable,
 			// (which logically implies that there must be an entry point)
@@ -1441,42 +1518,42 @@ const char* returnsno2str(Returns no)
 {
 	switch (no) {
 		case Success: return "Success";
-		case CompilationHadWarnings: return "CompilationHadWarnings";
-		case BackendNonZeroExitcode: return "BackendNonZeroExitcode";
-		case EverythingCouldBeWrong: return "EverythingCouldBeWrong";
-		case NoFilesGiven: return "NoFilesGiven";
-		case NoFunctions: return "NoFunctions";
-		case NoArgumentsGiven: return "NoArgumentsGiven";
-		case FileEmpty: return "FileEmpty";
-		case FunctionEmpty: return "FunctionEmpty";
-		case EntryPointEmpty: return "EntryPointEmpty";
-		case UnexpectedArguments: return "UnexpectedArguments";
-		case UnexpectedEndOfFile: return "UnexpectedEndOfFile";
-		case InvalidSyntax: return "InvalidSyntax";
-		case IsThisYours: return "IsThisYours";
-		case VariableRedefinition: return "VariableRedefinition";
-		case FunctionRedefinition: return "FunctionRedefinition";
-		case ErrorReadInput: return "ErrorReadInput";
-		case ErrorWriteOutput: return "ErrorWriteOutput";
-		case InvalidTargetTriple: return "InvalidTargetTriple";
-		case FunctionNeverCalled: return "FunctionNeverCalled";
-		case FunctionNeverDefined: return "FunctionNeverDefined";
-		case UnusedVariable: return "UnusedVariable";
-		case ExpectedSemicolon: return "ExpectedSemicolon";
-		case ErrorWritingIrOfFile: return "ErrorWritingIrOfFile";
-		case VariableIsShadowed: return "VariableIsShadowed";
-		case NestedFunction: return "NestedFunction";
-		case UnsupportedTarget: return "UnsupportedTarget";
-		case NoEntryPoint: return "NoEntryPoint";
-		case MultipleEntryPoints: return "MultipleEntryPoints";
-		case LangFeatureUnavailable: return "LangFeatureUnavailable";
-		case TotalAmountOfReturns: NOB_UNREACHABLE(nob_temp_sprintf("returns2str: `TotalAmountOfReturns` (%d) should not be passed here", no));
-		case FileNotCompiledYet: return "FileNotCompiledYet";
+		case CompilationHadWarnings: return "Compilation had warnings";
+		case BackendNonZeroExitcode: return "Backend non zero exitcode";
+		case EverythingCouldBeWrong: return "Everything could be wrong";
+		case NoFilesGiven: return "No files given";
+		case NoFunctions: return "No functions";
+		case NoArgumentsGiven: return "No arguments given";
+		case FileEmpty: return "File empty";
+		case FunctionEmpty: return "Function empty";
+		case EntryPointEmpty: return "Entry point empty";
+		case UnexpectedArguments: return "Unexpected arguments";
+		case UnexpectedEndOfFile: return "Unexpected end of file";
+		case InvalidSyntax: return "Invalid syntax";
+		case IsThisYours: return "Is this yours?";
+		case VariableRedefinition: return "Variable redefinition";
+		case FunctionRedefinition: return "Function redefinition";
+		case ErrorReadInput: return "Read error";
+		case ErrorWriteOutput: return "Write error";
+		case InvalidTargetTriple: return "Invalid target triple";
+		case FunctionNeverCalled: return "Function never called";
+		case FunctionNeverDefined: return "Function never defined";
+		case UnusedVariable: return "Unused variable";
+		case ExpectedSemicolon: return "Expected semicolon";
+		case ErrorWritingIrOfFile: return "Error writing IR of file";
+		case VariableIsShadowed: return "Variable is shadowed";
+		case NestedFunction: return "Nested function";
+		case UnsupportedTarget: return "Unsupported target";
+		case NoEntryPoint: return "No entry point";
+		case MultipleEntryPoints: return "Multiple entry points";
+		case LangFeatureUnavailable: return "Language feature unavailable";
+		case TotalAmountOfReturns: NOB_UNREACHABLE(nob_temp_sprintf("returns2str: `TotalAmountOfReturns` (%d) should not be getting passed here", no));
+		case FileNotCompiledYet: return "File not compiled yet";
 		default: NOB_UNREACHABLE("returnsno2str: unhandled case.");
 	}
 }
 
-bool dispatch_clang(std::string& output_file)
+bool dispatch_clang(const std::string& output_file)
 {
 	bool delete_ir = false;
 	switch (c.GetIROutput()) {
@@ -1507,8 +1584,16 @@ bool dispatch_clang(std::string& output_file)
 
 	if (c.wants_executable && (input_files.size() == 1)) {
 		std::string ll_file = swap_extension(input_files[0].filepath, "ll");
-		nob_cmd_append(&clang_cmd, "clang");
-		nob_cmd_append(&clang_cmd, "-o", use_custom_output ? output_file.data() : chop_extension(input_files[0].filepath));
+
+		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) {
+			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]); // hack I don't really like
+		}
+
+		nob_cmd_append(&clang_cmd, "-o");
+
+		if (use_custom_output) nob_cmd_append(&clang_cmd, output_file.data());
+		else nob_cmd_append(&clang_cmd, chop_extension(input_files[0].filepath));
+
 		nob_cmd_append(&clang_cmd, ll_file.data());
 
 		if (!nob_cmd_run(&clang_cmd))
@@ -1525,7 +1610,11 @@ bool dispatch_clang(std::string& output_file)
 		std::string ll_file = swap_extension(input_files[i].filepath, "ll");
 		std::string obj_file = swap_extension(input_files[i].filepath, "o");
 
-		nob_cmd_append(&clang_cmd, "clang", "-c", "-o", obj_file.data(), ll_file.data());
+		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) {
+			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]);
+		}
+
+		nob_cmd_append(&clang_cmd, "-c", "-o", obj_file.data(), ll_file.data());
 
 		if (!nob_cmd_run(&clang_cmd, .async = &procs))
 			return false;
@@ -1538,9 +1627,11 @@ bool dispatch_clang(std::string& output_file)
 
 	procs.count = 0;
 
-	// Create executable
 	if (c.wants_executable) {
-		nob_cmd_append(&clang_cmd, "clang");
+		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) {
+			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]);
+		}
+
 		nob_cmd_append(&clang_cmd, "-o", use_custom_output ? output_file.data() : chop_extension(input_files[0].filepath));
 
 		for (int i = 0; i < (int)input_files.size(); ++i) {
