@@ -49,6 +49,14 @@ inline void LLVM_IR::append_vid(Variable_Id vid)
 	}
 }
 
+inline void LLVM_IR::append_attr_group(int group)
+{
+	if (group < 0) return;
+
+	append(" #");
+	append(std::to_string(group));
+}
+
 inline void LLVM_IR::nl(void)
 {
 	push_back('\n');
@@ -104,8 +112,8 @@ void gen_func_begin(LLVM_IR& ir, const B_Function& sym)
 	ir.append_vt(Int);
 	ir += " @";
 	ir.append(sym.name);
-	ir += "() #";
-	ir.append(std::to_string(sym.attr_group));
+	ir += "()";
+	ir.append_attr_group(sym.attr_group);
 	ir += " {\n";
 }
 

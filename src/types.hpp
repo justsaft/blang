@@ -136,6 +136,7 @@ struct LLVM_IR : std::string {
 	inline void append_vt(Value_Type vt);
 	inline void append_align(Value_Type vt);
 	inline void append_vid(Variable_Id vid);
+	inline void append_attr_group(int group);
 	inline void nl(void); // New line
 };
 
