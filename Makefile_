@@ -8,7 +8,7 @@ nob_build: nob
 	./nob
 
 build: build_dir $(BLD)main.o $(BLD)ir_gen.o $(BLD)cli.o $(BLD)clex_util.o $(BLD)nob.o $(BLD)clex.o $(BLD)output.o
-	g++ -o blang $(BLD)main.o $(BLD)cli.o $(BLD)clex.o $(BLD)clex_util.o $(BLD)nob.o $(BLD)output.o $(BLD)ir_gen.o
+	g++ -o blang $(BLD)main.o $(BLD)cli.o $(BLD)clex.o $(BLD)clex_util.o $(BLD)nob.o $(BLD)output.o $(BLD)ir_gen.o $(BLD)test.o $(BLD)backend.o
 
 build_dir:
 	mkdir -p $(BLD)
@@ -21,9 +21,6 @@ $(BLD)main.o:
 
 $(BLD)ir_gen.o:
 	g++ $(FLAGS) $(BLD)ir_gen.o $(SRC)gen_ir.cpp
-
-# $(BLD)state.o:
-# 	g++ $(FLAGS) $(BLD)state.o $(SRC)state.cpp
 
 $(BLD)cli.o:
 	g++ $(FLAGS) $(BLD)cli.o $(SRC)cli.cpp
@@ -40,3 +37,8 @@ $(BLD)clex.o:
 $(BLD)output.o:
 	gcc $(FLAGS) $(BLD)output.o $(SRC)output.c
 
+$(BLD)test.o:
+	gcc $(FLAGS) $(BLD)test.o $(SRC)test.cpp
+
+$(BLD)backend.o:
+	gcc $(FLAGS) $(BLD)backend.o $(SRC)backend.cpp
