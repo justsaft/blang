@@ -24,12 +24,12 @@ static void usage(const char* program_name)
 	fprintf(stderr, "  -t, --target         Specify the target triple\n");
 	fprintf(stderr, "  --print-target       Prints the target triple and exits.\n");
 	fprintf(stderr, "\nCompilation:\n");
-	fprintf(stderr, "  -c, --compile   		Only compile (do not produce an excutable)\n");
+	fprintf(stderr, "  -c, --compile   		Only compile (do not produce an executable)\n");
 	fprintf(stderr, "  --emit-ir            Emit only the IR\n");
 	fprintf(stderr, "  --keep-ir            Keep the generated IR (default)\n");
 	fprintf(stderr, "\nLanguage:\n");
 	fprintf(stderr, "  --bext               Use the same compile standard as B-Ext\n");
-	fprintf(stderr, "                       (implies --modern --largeint)\n");
+	fprintf(stderr, "                       (implies --modern --largeword)\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "  --historical         Use the original 16-Bit compile standard as B (default)\n");
 	fprintf(stderr, "  --modern             Enable modern language features\n");
@@ -44,7 +44,7 @@ static void version(void)
 	fprintf(stderr, "Build time: %s\n", __TIME__);
 #if defined(DEBUG)
 	fprintf(stderr, "THIS BUILD WAS BUILT WITH -DDEBUG\n");
-	fprintf(stderr, "            Debug build.\n");
+	fprintf(stderr, "        Debug build.\n");
 #endif
 }
 
