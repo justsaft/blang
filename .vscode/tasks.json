@@ -17,7 +17,14 @@
 				"args": [
 					"-lc",
 					"[ -e \"${workspaceFolder}/nob\" ] || (cc build.c -o nob && exit $?)"
-				],
+				]
+			},
+			"osx": {
+				"command": "bash",
+				"args": [
+					"-lc",
+					"[ -e \"${workspaceFolder}/nob\" ] || (clang build.c -o nob && exit $?)"
+				]
 			},
 			"detail": "Build Nob (Task)"
 		},
@@ -30,17 +37,19 @@
 			],
 			"windows": {
 				"command": "${workspaceFolder}/nob.exe",
-				"args": [ ]
 			},
 			"linux": {
 				"command": "${workspaceFolder}/nob",
-				"args": []
 			},
+			"osx": {
+				"command": "${workspaceFolder}/nob",
+			},
+			"args": [],
 			"group": {
-				"kind": "build",
-				"isDefault": true
+				"kind": "build"
 			},
-			"detail": "Build the project with Nob (Task)"
+			"detail": "Build the project with Nob (Task)",
+			"problemMatcher": []
 		},
 		{
 			"label": "BuildWithNobDebug",
@@ -51,17 +60,46 @@
 			],
 			"windows": {
 				"command": "${workspaceFolder}/nob.exe",
-				"args": [ "--debug" ]
 			},
 			"linux": {
 				"command": "${workspaceFolder}/nob",
-				"args": [ "--debug" ]
 			},
+			"osx": {
+				"command": "${workspaceFolder}/nob",
+			},
+			"args": [
+				"--debug"
+			],
 			"group": {
-				"kind": "build",
-				"isDefault": true
+				"kind": "build"
 			},
-			"detail": "Build the project with Nob (Debug flag) (Task)"
-		}
+			"detail": "Build the project with Nob (Debug flag) (Task)",
+			"problemMatcher": []
+		}/* ,
+		{
+			"label": "BuildWithNobTestProg",
+			"type": "shell",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"BuildNob"
+			],
+			"windows": {
+				"command": "${workspaceFolder}/nob.exe",
+			},
+			"linux": {
+				"command": "${workspaceFolder}/nob",
+			},
+			"osx": {
+				"command": "${workspaceFolder}/nob",
+			},
+			"args": [
+				"--debug", "--test"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"detail": "Build the test program (Task)",
+			"problemMatcher": []
+		} */
 	]
 }

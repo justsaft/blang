@@ -2,11 +2,43 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Nob built project with gdb",
+            "name": "Debug Nob Recipe (lldb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/blang",
-            "args": [ "${workspaceRoot}/b_src/030-addtest.b" ],
+            "program": "${workspaceFolder}/nob",
+            "args": [
+                "--debug"
+            ],
+            "stopAtEntry": true,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "preLaunchTask": "BuildNob",
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
+        {
+            "name": "Debug Nob built project (lldb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/blang",
+            "args": [
+                "b_src/023-assignment.b"
+            ],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "BuildWithNobDebug",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
+        {
+            "name": "Debug Nob built project (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/blang",
+            "args": [
+                "b_src/023-assignment.b"
+            ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "BuildWithNobDebug",
@@ -25,6 +57,32 @@
                     "ignoreFailures": true
                 }
             ]
-        }
+        }/* ,
+        {
+            "name": "Debug test program (nob built)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/test",
+            "args": [
+                "b_src/023-assignment.b"
+            ],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "BuildWithNobTestProg",
+            "environment": [],
+            "externalConsole": false,
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        } */
     ]
 }
