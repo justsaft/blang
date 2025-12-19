@@ -39,7 +39,9 @@ public:
 
 public:
     bool Check(void) const;
-    const char* GetCommand(void) const;
+    bool Call() const;
+
+    const char** GetCommand(void) const;
 
     inline const char* GetName(void) const
     {
@@ -56,10 +58,9 @@ public:
         return backend;
     }
 
-
 protected:
     friend void parse_cli_arguments(int, char**, B_Files&, Compilation&);
-    bool SetFromCli(const char*);
+    // bool SetFromCli(const char*);
 
     inline void Set(Backends b)
     {

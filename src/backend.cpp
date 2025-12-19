@@ -1,6 +1,7 @@
 
 #include <memory>
 #include <stdexcept>
+#include <algorithm>
 
 #include "compilation.hpp"
 #include "backend.hpp"
@@ -18,11 +19,22 @@ extern "C" {
 // 	"aarch64-pc-windows-gnu",
 // };
 
-const char* Backend::GetCommand(void) const
+bool Backend::Call() const
 {
+    NOB_TODO("Backend::Call");
+    return false;
+}
+
+const char** Backend::GetCommand(void) const
+{
+    static const char* CLANG_CMD[] = { "clang", "-Wno-override-module", nullptr };
+    static const char* LLC_CMD[] = { "llc", nullptr };
+
     switch (backend) {
-        case CLANG: return "clang";
-        case LLC: return "llc";
+        case CLANG: return CLANG_CMD;
+        case LLC: return LLC_CMD;
+
+        case Autofind: NOB_UNREACHABLE("Backend Autofind was not triggered.");
         default: NOB_UNREACHABLE("Backend not implmented");
     }
 }
@@ -63,8 +75,8 @@ bool Backend::Check(void) const
 const char* backend2str(Backends b)
 {
     switch (b) {
-        case CLANG: return "Clang";
-        case LLC: return "LLC";
+        case CLANG: return "clang";
+        case LLC: return "llc";
         case NoBackendInstalled: return "No backend installed"; break;
         case Autofind: return "Autofind was not triggered"; break;
         case TotalAmountOfBackends: NOB_UNREACHABLE("backend2str: `TotalAmountOfBackends` should not be passed here");
