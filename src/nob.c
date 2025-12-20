@@ -7,6 +7,11 @@
 // and clang can't just figure out that it should just work
 #endif
 
+#ifdef __linux__
+#include <features.h>
+#include <bits/time.h>
+#endif
+
 #define NOB_IMPLEMENTATION
 #include "../3rd-party/nob.h"
 
