@@ -16,6 +16,19 @@ extern "C"
 	void set_minimal_nob_log_level(Nob_Log_Level level);
 }
 
+template <size_t N>
+constexpr size_t nob_countof(const char* const (&)[N])
+{
+	return N;
+}
+
+#undef nob_cmd_append
+#define nob_cmd_append(cmd, ...) \
+    do { \
+        const char* nob_tmp[] = { __VA_ARGS__ }; \
+        nob_da_append_many((cmd), nob_tmp, \
+        nob_countof(nob_tmp)); \
+    } while (0)
 
 
 // Driver
