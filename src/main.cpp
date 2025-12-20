@@ -32,7 +32,7 @@ constexpr size_t nob_countof(const char* const (&)[N])
 
 
 // Driver
-bool dispatch_clang(const std::string& output_file_name);
+Returns dispatch_clang(const std::string& output_file_name);
 
 
 // Parsing
@@ -182,8 +182,8 @@ int main(int argc, char** argv)
 		if (c.warnings)
 			nob_log(NOB_INFO, "Compilation: %*d warnings", 3, c.warnings);
 
-		if ((!c.stop) && (!dispatch_clang(c.output)))
-			c.state = BackendNonZeroExitcode;
+		if (!c.stop)
+			c.state = dispatch_clang(c.output);
 	}
 
 	return c.state;
@@ -1555,17 +1555,21 @@ const char* returnsno2str(Returns no)
 	}
 }
 
-bool dispatch_clang(const std::string& output_file)
+Returns dispatch_clang(const std::string& output_file)
 {
-	bool delete_ir = false;
+	static bool delete_intermediate_outputs = false;
+
+	if (!_debug) set_minimal_nob_log_level(NOB_WARNING);
+
 	switch (c.GetIROutput()) {
-		case DontCompile: return true;
 		case DeleteIrAfterCompile:
 #if (FILE_DELETIONS == ENABLE) && !defined(DEBUG)
-			delete_ir = true; [[fallthrough]];
+			delete_intermediate_outputs = true;
+			[[fallthrough]];
 #endif
 		case KeepIrAfterCompile: break;
-		default: NOB_UNREACHABLE("Unhandled case for keeping or deleting IR");
+		case DontCompile: return Success;
+			// default: NOB_UNREACHABLE("Unhandled case for keeping or deleting IR");
 	}
 
 	bool use_custom_output = false;
@@ -1578,6 +1582,7 @@ bool dispatch_clang(const std::string& output_file)
 			c.wants_executable = false;
 	}
 
+	static Returns result = Success;
 	static Nob_Cmd clang_cmd { };
 	static Nob_Procs procs { };
 
@@ -1587,9 +1592,8 @@ bool dispatch_clang(const std::string& output_file)
 	if (c.wants_executable && (input_files.size() == 1)) {
 		std::string ll_file = swap_extension(input_files[0].filepath, "ll");
 
-		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) {
-			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]); // hack I don't really like
-		}
+		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) // hack I don't really like
+			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]);
 
 		nob_cmd_append(&clang_cmd, "-o");
 
@@ -1598,16 +1602,17 @@ bool dispatch_clang(const std::string& output_file)
 
 		nob_cmd_append(&clang_cmd, ll_file.data());
 
-		if (!nob_cmd_run(&clang_cmd))
-			return false;
+		if (!nob_cmd_run(&clang_cmd, .async = &procs, .max_procs = 1) && !nob_procs_wait(procs))
+			result = BackendNonZeroExitcode;
 
-		if (delete_ir)
-			nob_delete_file(ll_file.data());
+		if (!_debug && delete_intermediate_outputs) if (!nob_delete_file(ll_file.data()))
+			result = ErrorWriteOutput;
 
-		return true;
+		nob_cmd_free(clang_cmd);
+		nob_da_free(procs);
+		return result;
 	}
 
-	// Compile our generated LLVM IR to an object
 	for (int i = 0; i < (int)input_files.size(); ++i) {
 		std::string ll_file = swap_extension(input_files[i].filepath, "ll");
 		std::string obj_file = swap_extension(input_files[i].filepath, "o");
@@ -1618,18 +1623,18 @@ bool dispatch_clang(const std::string& output_file)
 
 		nob_cmd_append(&clang_cmd, "-c", "-o", obj_file.data(), ll_file.data());
 
-		if (!nob_cmd_run(&clang_cmd, .async = &procs))
-			return false;
+		if (!nob_cmd_run(&clang_cmd, .async = &procs, .max_procs = 1))
+			result = BackendNonZeroExitcode;
 
 		clang_cmd.count = 0;
 	}
 
 	if (!nob_procs_wait(procs))
-		return false;
+		result = BackendNonZeroExitcode;
 
 	procs.count = 0;
 
-	if (c.wants_executable) {
+	if ((result == Success) && c.wants_executable) {
 		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) {
 			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]);
 		}
@@ -1637,24 +1642,25 @@ bool dispatch_clang(const std::string& output_file)
 		nob_cmd_append(&clang_cmd, "-o", use_custom_output ? output_file.data() : chop_extension(input_files[0].filepath));
 
 		for (int i = 0; i < (int)input_files.size(); ++i) {
-			if (delete_ir)
+			if (delete_intermediate_outputs)
 				nob_delete_file(swap_extension(input_files[i].filepath, "ll"));
 
 			nob_cmd_append(&clang_cmd, swap_extension(input_files[i].filepath, "o"));
 		}
 
 		if (!nob_cmd_run(&clang_cmd, .async = &procs))
-			return false;
+			result = BackendNonZeroExitcode;
 
 		clang_cmd.count = 0;
 
 		if (!nob_procs_wait(procs))
-			return false;
-
-		procs.count = 0;
+			result =  BackendNonZeroExitcode;
 	}
 
-	return true;
+	nob_da_free(procs);
+	nob_cmd_free(clang_cmd);
+
+	return result;
 }
 
 // void update_state(const bool is_main, const int file, Returns fut)
