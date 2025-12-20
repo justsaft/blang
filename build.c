@@ -7,6 +7,16 @@
 #define BLANG "blang"
 #endif
 
+void clex_extra(Nob_Cmd* cmd)
+{
+	nob_cmd_append(cmd, "-Wno-unused-function", "-Wno-self-assign");
+}
+
+void nob_extra(Nob_Cmd* cmd)
+{
+	nob_cmd_append(cmd, "-Wno-unused-result");
+}
+
 int main(int argc, char** argv)
 {
 	NOB_GO_REBUILD_URSELF(argc, argv);
@@ -18,17 +28,16 @@ int main(int argc, char** argv)
 	Nob_Procs procs = { 0 };
 	TUs tus = { 0 };
 
-	if (flags.testprog)
-		run_sub_recipe_async(argc, argv, "build_test.c", &procs);
+	if (flags.testprog) run_sub_recipe_async(argc, argv, "build_test.c", &procs);
 
-	add_tu(&tus, "backend.cpp");
-	add_tu(&tus, "clex_util.cpp");
-	add_tu(&tus, "clex.c");
-	add_tu(&tus, "cli.cpp");
-	add_tu(&tus, "gen_ir.cpp");
-	add_tu(&tus, "main.cpp");
-	add_tu(&tus, "nob.c");
-	add_tu(&tus, "output.c");
+	add_tu(&tus, "backend.cpp", NULL);
+	add_tu(&tus, "clex_util.cpp", NULL);
+	add_tu(&tus, "clex.c", clex_extra);
+	add_tu(&tus, "cli.cpp", NULL);
+	add_tu(&tus, "gen_ir.cpp", NULL);
+	add_tu(&tus, "main.cpp", NULL);
+	add_tu(&tus, "nob.c", nob_extra);
+	add_tu(&tus, "output.c", NULL);
 
 	compile_all(&cmds, &tus, &procs);
 	wait_barrier(&procs);

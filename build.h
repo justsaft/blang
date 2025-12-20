@@ -59,6 +59,7 @@ typedef struct {
 } Nob_Cmds;
 
 typedef struct {
+    void (*cmd_extra)(Nob_Cmd*);
     char* src_file;
     char* o_file;
     bool rebuild;
@@ -145,9 +146,10 @@ char* swap_extension(const char* filename, const char* new_extension)
     return result;
 }
 
-void add_tu(TUs* tus, const char* filename)
+void add_tu(TUs* tus, const char* filename, void (*cmd_extra)(Nob_Cmd*))
 {
-    TU tu = { 0 };
+    TU tu = { .cmd_extra = cmd_extra != NULL ? cmd_extra : NULL };
+
     tu.src_file = strconcat(SRC, filename);
     tu.o_file = strconcat(BLD, flags.debug ? DEBUG_O_FOLDER : RELEASE_O_FOLDER);
     tu.o_file = strconcat(tu.o_file, swap_extension(filename, "o"));
@@ -190,6 +192,7 @@ void compile_all(Nob_Cmds* cmds, TUs* tus, Nob_Procs* procs)
         else NOB_UNREACHABLE("Don't know what Compiler to append");
 
         nob_cmd_append(cmd, tu->o_file);
+        if ((tu->cmd_extra) != NULL) tu->cmd_extra(cmd);
         nob_cmd_append(cmd, tu->src_file);
 
         if (flags.debug) nob_cmd_append(cmd, DEBUG, OPT_DEBUG);
@@ -204,8 +207,7 @@ void link_tus(TUs* tus, Nob_Procs* procs, const char* execname)
 {
     Nob_Cmd linkcmd = { 0 };
 
-    nob_cmd_append(&linkcmd, LINK);
-    nob_cmd_append(&linkcmd, execname);
+    nob_cmd_append(&linkcmd, LINK, execname);
 
     bool skip = true;
     nob_da_foreach(TU, it, tus)
