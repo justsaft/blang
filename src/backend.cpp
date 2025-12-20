@@ -134,7 +134,7 @@ std::string get_target_triple(Backends b)
 
 std::string get_target_triple_clang(void)
 {
-#if defined(_WIN32) && false
+#if defined(_WIN32)
 
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -183,12 +183,6 @@ std::string get_target_triple_clang(void)
         result.pop_back();
     }
 
-    if (result.find("unknown") != std::string::npos) {
-        nob_log(NOB_ERROR, "Target %s is not a valid target", result.c_str());
-        Compilation_error(UnsupportedTarget);
-        exit(UnsupportedTarget);
-    }
-
 #else
 
     std::array<char, 128> buffer { };
@@ -208,12 +202,6 @@ std::string get_target_triple_clang(void)
     // Remove trailing newline if present
     if ((!result.empty()) && (result.back() == '\n')) {
         result.pop_back();
-    }
-
-    if (strstr(result.data(), "unknown") != NULL) {
-        nob_log(NOB_ERROR, "Target %s is not a valid target", result.c_str());
-        Compilation_error(UnsupportedTarget);
-        exit(UnsupportedTarget);
     }
 
 #endif
