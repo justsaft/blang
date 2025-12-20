@@ -6,7 +6,7 @@
 #define DEBUG_O_FOLDER "debug/"
 #define RELEASE_O_FOLDER "rel/"
 
-#if (__GNUC__ > 4) && (__APPLE__ != 1)
+#if (__GNUC__ >= 0) && (__APPLE__ != 1)
 #define LESS_WARNS "-Wno-unused-function"
 #define WARNS "-Wall", "-Wextra", "-Wno-missing-field-initializers"
 #define DEBUG "-ggdb", "-DDEBUG"
@@ -22,7 +22,7 @@
 #elif (__clang__ == 1) || (__APPLE__ == 1)
 #define LESS_WARNS "-Wno-unused-function", "-Wno-self-assign"
 #define WARNS "-Wno-deprecated-declarations", "-Wno-non-c-typedef-for-linkage", "-Wno-missing-field-initializers"
-#define OPT_DEBUG "-Og"
+#define OPT_DEBUG "-O0"
 #define OPT_RELEASE "-O2"
 #define DEBUG "-glldb", "-DDEBUG"
 #define CC "clang", "-c", WARNS, "-std=c11", "-o"
@@ -44,13 +44,13 @@
 #endif
 
 #define NOB_IMPLEMENTATION
-#define NOB_REBUILD_URSELF(binary_path, source_path) CC_, binary_path, source_path
 #if !defined(_WIN32)
 #define NOB_EXPERIMENTAL_DELETE_OLD
 #endif
 #include "3rd-party/nob.h"
-#undef NOB_GO_REBUILD_URSELF
-#define NOB_GO_REBUILD_URSELF(argc, argv) nob__go_rebuild_urself(argc, argv, __FILE__, "build.h", NULL)
+// #define NOB_REBUILD_URSELF(binary_path, source_path) CC_, binary_path, source_path
+// #undef NOB_GO_REBUILD_URSELF
+// #define NOB_GO_REBUILD_URSELF(argc, argv) nob__go_rebuild_urself(argc, argv, __FILE__, "build.h", NULL)
 
 typedef struct {
     Nob_Cmd* items;
