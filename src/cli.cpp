@@ -42,10 +42,11 @@ static void version(void)
 	fprintf(stderr, "Version: 0.0.4\n");
 	fprintf(stderr, "Build date: %s\n", __DATE__);
 	fprintf(stderr, "Build time: %s\n", __TIME__);
-#if defined(DEBUG)
-	fprintf(stderr, "THIS BUILD WAS BUILT WITH -DDEBUG\n");
-	fprintf(stderr, "        Debug build.\n");
-#endif
+
+	if (_debug) {
+		fprintf(stderr, "THIS BUILD WAS BUILT WITH -DDEBUG\n");
+		fprintf(stderr, "        Debug build.\n");
+	}
 }
 
 void parse_cli_arguments(int argc, char** argv, B_Files& input_files, Compilation& comp)

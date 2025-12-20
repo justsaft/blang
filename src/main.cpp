@@ -16,11 +16,6 @@ extern "C"
 	void set_minimal_nob_log_level(Nob_Log_Level level);
 }
 
-#if defined(DEBUG)
-constexpr bool _debug = true;
-#else
-constexpr bool _debug = false;
-#endif
 
 
 // Driver
@@ -132,10 +127,7 @@ int main(int argc, char** argv)
 #endif
 
 	for (int file = 0; file < (int)input_files.size(); ++file) { // For each file
-
-#if defined(DEBUG)
-		nob_log(NOB_INFO, "%s: compiling", CurrentFile);
-#endif
+		if (_debug) nob_log(NOB_INFO, "%s: compiling", CurrentFile);
 
 		CurrentFileState =
 			// parse_file parses until end of file
@@ -1503,13 +1495,10 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 
 	if (c.stop) {
 		nob_log(NOB_INFO, "Stopping compilation: %*d errors, %*d warnings", 3, c.errors, 3, c.warnings);
-#if defined(DEBUG)
-		if ((compiler_file != nullptr) && (file_line > -1))
-			nob_log(NOB_INFO, "%s:%d:%d: <--- compilation stopped here in compiler.", compiler_file, file_line, 1);
-#else
-		(void)compiler_file;
-		(void)file_line;
-#endif
+		if (_debug) {
+			if ((compiler_file != nullptr) && (file_line > -1))
+				nob_log(NOB_INFO, "%s:%d:%d: <--- compilation stopped here in compiler.", compiler_file, file_line, 1);
+		}
 		exit(e);
 	} else return;
 }

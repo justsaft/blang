@@ -29,4 +29,11 @@ void compilation_error(Returns e, const char* compiler_file = nullptr, const int
 #define truefalse 0b10
 #define truetrue 0b11
 
+#if defined(DEBUG)
+constexpr bool _debug = true;
+#else
+constexpr bool _debug = false;
+#endif
+
+
 #endif
