@@ -9,7 +9,6 @@
 
 int main(int argc, char** argv)
 {
-    NOB_GO_REBUILD_URSELF(argc, argv);
     parse_cli(argc, argv);
 
     Nob_Procs procs = { 0 };
