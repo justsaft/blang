@@ -1501,9 +1501,13 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 			c.stop = true;
 			break;
 
+		case UnsupportedTarget: NOB_TODO("compilation_error: UnsupportedTarget was passed.");
+			// TODO: implement a form of continuing anyways for debug builds I guess.
+			// This is assuming you'll be able to identify invalid target triples reliably.
+			// Probably I don't wanna bother doing this at all.
 
 		case Success: NOB_UNREACHABLE(nob_temp_sprintf("`%s` (%d) passed to `compilation_error`", returnsno2str(e), e));
-		default: NOB_UNREACHABLE(nob_temp_sprintf("compilation_error: `%s` (%d) not implemented.", returnsno2str(e), e));
+		default: NOB_UNREACHABLE(nob_temp_sprintf("compilation_error: handling of error `%s` (%d) hasn't been implemented yet.", returnsno2str(e), e));
 	}
 
 	if (c.stop) {
@@ -1551,8 +1555,10 @@ const char* returnsno2str(Returns no)
 		case LangFeatureUnavailable: return "Language feature unavailable";
 		case TotalAmountOfReturns: NOB_UNREACHABLE(nob_temp_sprintf("returns2str: `TotalAmountOfReturns` (%d) should not be getting passed here", no));
 		case FileNotCompiledYet: return "File not compiled yet";
-		default: NOB_UNREACHABLE("returnsno2str: unhandled case.");
 	}
+
+	// Keep this outside so the compiler warns about new cases
+	NOB_UNREACHABLE("returnsno2str: unhandled case.");
 }
 
 Returns dispatch_clang(const std::string& output_file)
