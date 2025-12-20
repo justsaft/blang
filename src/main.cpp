@@ -851,6 +851,10 @@ Keywords check_statement_identifier(const char* k)
 
 Returns parse_label(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
 	// Lexer:
 
 	scope.labels.insert({ l.string, scope.labels.size() });
@@ -869,36 +873,60 @@ Returns parse_label(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 
 Returns parse_goto_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("goto not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("goto not yet implemented");
 }
 
 Returns parse_while_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("while not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("while not yet implemented");
 
 }
 
 Returns parse_else_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("else not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("else not yet implemented");
 
 }
 
 Returns parse_if_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("if not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("if not yet implemented");
 
 }
 
 Returns parse_case_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("case not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("case not yet implemented");
 
 }
 
 Returns parse_switch_keyword(Lexer& l, LLVM_IR& ir, B_Scope& scope, const int file)
 {
-	NOB_UNREACHABLE("switch not yet implemented");
+	(void)l;
+	(void)ir;
+	(void)scope;
+	(void)file;
+	NOB_TODO("switch not yet implemented");
 
 }
 
