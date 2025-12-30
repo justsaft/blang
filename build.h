@@ -10,7 +10,7 @@
 #define LESS_WARNS "-Wno-unused-function"
 #define WARNS "-Wall", "-Wextra", "-Wno-missing-field-initializers"
 #define DEBUG "-ggdb", "-DDEBUG"
-#define OPT_DEBUG "-Og"
+#define OPT_DEBUG "-O0" /* -Og behaves differently since an update for some reason */
 #define OPT_RELEASE "-O2"
 #define CC "gcc", "-c", WARNS, "-std=c11", "-o"
 #define CC_ "gcc", WARNS, "-std=c11", "-o"

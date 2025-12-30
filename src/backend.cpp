@@ -19,12 +19,14 @@ extern "C" {
 // 	"aarch64-pc-windows-gnu",
 // };
 
+
 bool Backend::Call() const
 {
     NOB_TODO("Backend::Call");
     return false;
 }
 
+#if BACKEND_OLD_COMMAND_GETS == ENABLED
 const char** Backend::GetCommand(void) const
 {
     static const char* CLANG_CMD[] = { "clang", "-Wno-override-module", nullptr };
@@ -35,9 +37,27 @@ const char** Backend::GetCommand(void) const
         case LLC: return LLC_CMD;
 
         case Autofind: NOB_UNREACHABLE("Backend Autofind was not triggered.");
-        default: NOB_UNREACHABLE("Backend not implmented");
+        default: NOB_UNREACHABLE("Backend not implemented");
     }
 }
+
+#else
+
+const std::vector<std::string>& Backend::GetCommand(void) const
+{
+    static std::vector<std::string> CLANG_CMD = { "clang", "-Wno-override-module" };
+    static std::vector<std::string> LLC_CMD = { "llc" };
+
+    switch (backend) {
+        case CLANG: return CLANG_CMD;
+        case LLC: return LLC_CMD;
+
+        case Autofind: NOB_UNREACHABLE("Backend Autofind was not triggered.");
+        default: NOB_UNREACHABLE("Backend not implemented");
+    }
+}
+
+#endif
 
 void Backend::RunAutofind(void)
 {

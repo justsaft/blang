@@ -15,6 +15,7 @@ typedef SSIZE_T ssize_t;
 #include <map>
 #include <unordered_map>
 #include <tuple>
+#include <list>
 
 extern "C" {
 #include "../3rd-party/stb_c_lexer.h"
@@ -177,14 +178,47 @@ struct B_Function {
 //	std::vector<B_ItemLocation> locations;
 //};
 
-typedef std::vector<B_Variable> B_Variable_Scope;
-typedef std::vector<B_Function> B_Function_Scope;
+struct B_Variable_Scope : std::vector<B_Variable> {
+	~B_Variable_Scope()
+	{
+		if (size() == 0) return;
+
+		std::list<const char*> addrs;
+
+		for (auto& it : *this) {
+			const char*& name = it.name;
+
+			if (!name) continue;
+			if (addrs.size()) {
+				const auto& it = std::ranges::find(addrs.begin(), addrs.end(), name);
+				if (it != addrs.end()) continue;
+			}
+			addrs.push_back(name);
+		}
+
+		for (auto& it : addrs)
+			free((void*)it);
+	}
+};
+
+struct B_Function_Scope : std::vector<B_Function> {
+	void reset(void)
+	{
+		if (this->size() > 0) for (auto& it : *this)
+			free((void*)it.name);
+
+		clear();
+	}
+};
+
+// typedef std::vector<B_Variable> B_Variable_Scope;
+// typedef std::vector<B_Function> B_Function_Scope;
 //typedef std::map<std::string, std::vector<B_FunctionInfo>> B_FunctionScope_New;
 
 struct B_Scope {
 public:
 	static B_Function_Scope functions; // For all scopes
-	static B_Function_Scope extern_functions; // For all scopes
+	static B_Function_Scope extern_functions; // ???
 
 	bool is_switch = false;
 	size_t if_started = 0;

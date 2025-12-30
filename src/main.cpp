@@ -167,8 +167,8 @@ int main(int argc, char** argv)
 		}
 
 		file_ir.clear();
-		global_scope.functions.clear();
-		global_scope.extern_functions.clear();
+		global_scope.functions.reset();
+		global_scope.extern_functions.reset();
 	}
 
 #if defined(DEBUG) && (COMPILATION_RECAP == ENABLE)
@@ -1264,6 +1264,8 @@ Returns parse_function_call(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir, 
 
 Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR& ir, const char* name)
 {
+	Returns retval = Success;
+
 	// Lexer: main<<(>>) { ...
 	assert(l.Expect('('));
 
@@ -1283,11 +1285,10 @@ Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 		nob_log(NOB_ERROR, "%s:%d:%d: Nesting functions is not supported.",
 				l.filename, l.location.line_number, l.location.line_offset);
 		Compilation_error(NestedFunction);
-		exit(NestedFunction);
 	}
 
 	B_Function f {
-		.name = strdup(name), // memory leak
+		.name = strdup(name),
 		.in_file = file,
 		.definitions = 1, // This is the definition basically, and is disregarded if it already is defined
 		.location = l.location };
@@ -1298,8 +1299,10 @@ Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 		f.calls = WHERES_YOUR_GOD_NOW;
 		is_main = true;
 
-		if (c.has_entry)
+		if (c.has_entry) {
 			Compilation_error(MultipleEntryPoints);
+			retval = MultipleEntryPoints;
+		}
 
 		c.has_entry = true;
 	}
@@ -1322,6 +1325,7 @@ Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 					sc.extern_functions[efid].location.line_offset,
 					sc.extern_functions[efid].name);
 			Compilation_error(FunctionRedefinition);
+			retval = FunctionRedefinition;
 			break;
 
 		case 0b10: // means this name was defined as an extrn function
@@ -1333,15 +1337,20 @@ Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 					sc.extern_functions[efid].location.line_offset,
 					sc.extern_functions[efid].name);
 			Compilation_error(FunctionRedefinition);
+			retval = FunctionRedefinition;
 			break;
 
 		case 0b01: // means a function with this name already exists (not extrn)
 			if (sc.functions[fid].definitions > 0) {
-				if (is_main)
+				if (is_main) {
 					Compilation_error(MultipleEntryPoints);
+					retval = MultipleEntryPoints;
+				}
 
 				its_function_redefinition(f, sc.functions[fid]);
 				Compilation_error(FunctionRedefinition);
+				if (retval != MultipleEntryPoints)
+					retval = FunctionRedefinition;
 				// Fall through intentional
 			}
 
@@ -1350,14 +1359,12 @@ Returns parse_function_definition(const int file, B_Scope& sc, Lexer& l, LLVM_IR
 			sc.functions[fid].location = l.location;
 			break;
 
-		case 0b11: // means I can define whatever I needs to be defined
+		case 0b11: // No function with this name exists
 			sc.functions.push_back(f);
 			break;
 
 		default: NOB_UNREACHABLE("Is this yours?");
 	}
-
-	Returns retval = Success;
 
 	gen_func_begin(ir, f);
 
@@ -1525,6 +1532,7 @@ void compilation_error(Returns e, const char* compiler_file, const int file_line
 			c.stop = true;
 			break;
 
+		case NestedFunction:
 		case BackendNonZeroExitcode:
 			c.stop = true;
 			break;
@@ -1624,24 +1632,35 @@ Returns dispatch_clang(const std::string& output_file)
 	procs.count = 0;
 
 	if (c.wants_executable && (input_files.size() == 1)) {
-		std::string ll_file = swap_extension(input_files[0].filepath, "ll");
+		const char* ll_file = swap_extension(input_files[0].filepath, "ll");
 
 		for (uint8_t a = 0; backend.GetCommand()[a] != nullptr; ++a) // hack I don't really like
 			nob_cmd_append(&clang_cmd, backend.GetCommand()[a]);
 
+		for (const auto& it : backend.GetCmdOptionalFlags())
+			nob_cmd_append(&clang_cmd, it.c_str());
+
+		// why
+
+		// for (uint8_t a = 0; !backend.GetCmdOptionalFlag()[a].empty(); ++a)
+		// 	nob_cmd_append(&clang_cmd, backend.GetCmdOptionalFlag()[a].c_str());
+
 		nob_cmd_append(&clang_cmd, "-o");
+		char* filepath_chopped = chop_extension(input_files[0].filepath);
 
 		if (use_custom_output) nob_cmd_append(&clang_cmd, output_file.data());
-		else nob_cmd_append(&clang_cmd, chop_extension(input_files[0].filepath));
+		else nob_cmd_append(&clang_cmd, filepath_chopped);
 
-		nob_cmd_append(&clang_cmd, ll_file.data());
+		nob_cmd_append(&clang_cmd, ll_file);
 
 		if (!nob_cmd_run(&clang_cmd, .async = &procs, .max_procs = 1) && !nob_procs_wait(procs))
 			result = BackendNonZeroExitcode;
 
-		if (!_debug && delete_intermediate_outputs) if (!nob_delete_file(ll_file.data()))
+		if (!_debug && delete_intermediate_outputs) if (!nob_delete_file(ll_file))
 			result = ErrorWriteOutput;
 
+		free((void*)filepath_chopped);
+		free((void*)ll_file);
 		nob_cmd_free(clang_cmd);
 		nob_da_free(procs);
 		return result;
@@ -1688,7 +1707,7 @@ Returns dispatch_clang(const std::string& output_file)
 		clang_cmd.count = 0;
 
 		if (!nob_procs_wait(procs))
-			result =  BackendNonZeroExitcode;
+			result = BackendNonZeroExitcode;
 	}
 
 	nob_da_free(procs);

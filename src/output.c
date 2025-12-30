@@ -32,6 +32,7 @@ bool write_ll_file(const char* original_file, const char* ir, size_t ir_size)
 	}
 
 defer:
+	free((void*)ll_file);
 	return result;
 }
 
@@ -71,46 +72,32 @@ const char* get_extension(const char* filename)
 
 char* chop_extension(const char* filename)
 {
-	if (!filename) {
-		nob_log(NOB_ERROR, "Null input to chop_extension");
-		return NULL;
-	}
+	if (!filename) NOB_UNREACHABLE("Null input to chop_extension");
 
-	char* dot = (char*)strrchr(filename, '.');
+	char* dot = strrchr(filename, '.');
 
 	if (dot) {
 		size_t len = dot - filename;
-		char* result = (char*)malloc(len + 1);
-		if (!result) {
-			nob_log(NOB_ERROR, "Memory allocation failed in chop_extension");
-			return NULL;
-		}
+		char* result = malloc(len + 1);
+		if (!result) NOB_UNREACHABLE("Memory allocation failed in chop_extension");
 		strncpy(result, filename, len);
 		result[len] = '\0';
 		return result;
-	}
-	return (char*)filename; // No extension found, return a copy of the original string
+	} else return (char*)filename; // No extension found, return a copy of the original string
 }
 
 char* swap_extension(const char* filename, const char* new_extension)
 {
-	if (!filename || !new_extension) {
-		nob_log(NOB_ERROR, "Null input to swap_extension");
-		return NULL;
-	}
+	if (!filename || !new_extension) NOB_UNREACHABLE("Null input to swap_extension");
 	char* base = chop_extension(filename);
 	if (!base) {
 		nob_log(NOB_ERROR, "Failed to chop extension in swap_extension");
 		return NULL;
 	}
 	size_t len = strlen(base) + strlen(new_extension) + 2; // +1 for the dot and +1 for the null-terminator
-	char* result = (char*)malloc(len);
-	if (!result) {
-		nob_log(NOB_ERROR, "Memory allocation failed in swap_extension");
-		free(base);
-		return NULL;
-	}
-	sprintf(result, "%s.%s", base, new_extension);
+	char* result = malloc(len);
+	if (!result) NOB_UNREACHABLE("Memory allocation failed in swap_extension");
+	snprintf(result, len, "%s.%s", base, new_extension);
 	free(base);
 	return result;
 }

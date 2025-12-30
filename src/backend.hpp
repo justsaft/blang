@@ -41,7 +41,11 @@ public:
     bool Check(void) const;
     bool Call() const;
 
+#if BACKEND_OLD_COMMAND_GETS == ENABLED
     const char** GetCommand(void) const;
+#else
+    const std::vector<std::string>& GetCommand(void) const;
+#endif
 
     inline const char* GetName(void) const
     {
@@ -56,6 +60,31 @@ public:
     inline Backends Get(void) const
     {
         return backend;
+    }
+
+    inline void CmdAppendOptionalFlags(const char* flag)
+    {
+        cmd_additional.push_back(flag);
+    }
+
+    inline void CmdAppendOptionalFlags(const std::string& flag)
+    {
+        cmd_additional.push_back(flag);
+    }
+
+    inline const std::string* GetCmdOptionalFlag(void) const
+    {
+        return cmd_additional.data();
+    }
+
+    inline const std::vector<std::string>& GetCmdOptionalFlags(void) const
+    {
+        return cmd_additional;
+    }
+
+    inline const std::string& GetCmdOptionalFlag(size_t idx) const
+    {
+        return cmd_additional.at(idx);
     }
 
 protected:
@@ -77,6 +106,7 @@ protected:
 private:
     void RunAutofind(void);
 
+    std::vector<std::string> cmd_additional;
     Backends backend = Autofind;
 };
 

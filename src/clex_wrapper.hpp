@@ -62,7 +62,13 @@ public:
         m_ClexBuffer.reserve(CLEX_BUFFER_DEFAULT_SIZE);
     }
 
-    ~Lexer() = default;
+    ~Lexer()
+    {
+        if (!m_Forked) {
+            free((void*)m_ClexInputStream.items);
+            free((void*)m_FileName);
+        }
+    }
 
 
 public: // copy constructor
@@ -72,7 +78,9 @@ public: // copy constructor
         m_Location(other.m_Location),
         m_ClexBuffer(other.m_ClexBuffer),
         m_ClexInputStream(other.m_ClexInputStream)
-    { }
+    {
+        m_Forked = true;
+    }
 
 
 public:
@@ -249,6 +257,8 @@ public:
 
     Returns InitAndLoadFile(const char* filename)
     {
+        if (m_Forked) NOB_UNREACHABLE("Do not initalize a new file with your forked Lexer");
+
         if (m_ClexInputStream.count > m_ClexBuffer.capacity())
             m_ClexBuffer.resize(m_ClexInputStream.count);
 
@@ -262,6 +272,7 @@ public:
 
         if (!nob_read_entire_file(m_FileName, &m_ClexInputStream)) {
             nob_log(NOB_ERROR, "Could not load file %s.", m_FileName);
+            free((void*)m_FileName);
             return ErrorReadInput;
         }
 
@@ -288,7 +299,8 @@ public:
     }
 
 private:
-    const char* m_FileName = NULL;
+    bool m_Forked = false;
+    const char* m_FileName = nullptr;
     stb_lexer m_Lexer { };
     stb_lex_location m_Location { };
     std::vector<char> m_ClexBuffer { };
