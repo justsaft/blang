@@ -264,14 +264,16 @@ void run_sub_recipe_async(int argc, char** argv, const char* recipe, Nob_Procs* 
     nob_cc(&cmd);
     nob_cc_output(&cmd, output);
     nob_cc_inputs(&cmd, recipe);
-    nob_cmd_run_sync_and_reset(&cmd);
 
-    nob_cmd_append(&cmd, strconcat("./", output));
+    if (nob_cmd_run_sync_and_reset(&cmd)) {
+        nob_cmd_append(&cmd, strconcat("./", output));
 
-    for (int i = 1; i < argc; ++i)
-        nob_cmd_append(&cmd, argv[i]);
+        for (int i = 1; i < argc; ++i)
+            nob_cmd_append(&cmd, argv[i]);
 
-    if (!nob_cmd_run(&cmd, .async = procs, .max_procs = 3)) exit(69);
+        if (!nob_cmd_run(&cmd, .async = procs, .max_procs = 4)) exit(69);
+    }
 
+    free((void*)output);
     nob_cmd_free(cmd);
 }
