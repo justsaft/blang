@@ -239,15 +239,20 @@ void run_sub_recipe(int argc, char** argv, const char* recipe)
     nob_cc(&cmd);
     nob_cc_output(&cmd, output);
     nob_cc_inputs(&cmd, recipe);
-    if (!nob_cmd_run_sync_and_reset(&cmd)) exit(69);
 
-    nob_cmd_append(&cmd, strconcat("./", output));
+    if (nob_cmd_run_sync_and_reset(&cmd)) {
+        Nob_Procs procs = { 0 };
+        nob_cmd_append(&cmd, strconcat("./", output));
 
-    for (int i = 1; i < argc; ++i)
-        nob_cmd_append(&cmd, argv[i]);
+        for (int i = 1; i < argc; ++i)
+            nob_cmd_append(&cmd, argv[i]);
 
-    if (!nob_cmd_run_sync_and_reset(&cmd)) exit(69);
+        if (!nob_cmd_run(&cmd, .async = &procs, .max_procs = 1)) exit(69);
+        wait_barrier(&procs);
+        nob_da_free(procs);
+    }
 
+    free((void*)output);
     nob_cmd_free(cmd);
 }
 
